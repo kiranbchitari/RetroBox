@@ -1,0 +1,15 @@
+cores/src/
+cores/out/
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+*.jks
+*.keystore
+keystore.properties
+.DS_Store
+app/src/main/jniLibs/
+app/.cxx/
+tools/core-harness/core-harness
+.kotlin/

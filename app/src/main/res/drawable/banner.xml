@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 320x180dp launcher banner (vector so no bitmaps ship in the APK). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp" android:height="180dp" android:viewportWidth="320" android:viewportHeight="180">
+    <path android:fillColor="#0E1117" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#E8334A" android:pathData="M40,60h60v60h-60z" />
+    <path android:fillColor="#F5F7FA" android:pathData="M64,72h12v36h-12z M52,84h36v12h-36z" />
+    <path android:fillColor="#F5F7FA" android:pathData="M120,70h24v8h-24z M120,86h24v8h-24z M120,102h24v8h-24z" />
+</vector>
