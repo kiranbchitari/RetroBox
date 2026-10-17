@@ -21,7 +21,7 @@ object Originals {
 
     /** The games that ship inside the core: cartridge file name and the `game=` id the core knows. */
     data class Cartridge(val fileName: String, val gameId: String)
-    val cartridges = listOf(Cartridge("Snake.$EXTENSION", "snake"))
+    val cartridges = listOf(Cartridge("Snake.$EXTENSION", "snake"), Cartridge("Blizzard Buddies.$EXTENSION", "blizzard"))
 
     fun isCartridge(head: ByteArray?): Boolean = head != null && head.size >= MAGIC.size && MAGIC.indices.all { head[it] == MAGIC[it] }
 

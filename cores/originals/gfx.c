@@ -82,7 +82,40 @@ void gfx_rrect(Surf *s, float x, float y, float w, float h, float r, uint32_t c,
     }
 }
 
-void gfx_circle(Surf *s, float cx, float cy, float r, uint32_t rgb, int a) { gfx_rrect(s, cx - r, cy - r, 2.f * r, 2.f * r, r, rgb, a); }
+/* Circle: per row a solid middle span and anti-aliased edge pixels (distance based), so big circles stay cheap. */
+void gfx_circle(Surf *s, float cx, float cy, float r, uint32_t c, int a) {
+    if (r <= 0.f || a <= 0) return;
+    if (a > 255) a = 255;
+    int sr = (c >> 16) & 255, sg = (c >> 8) & 255, sb = c & 255;
+    uint16_t packed = pack565(sr, sg, sb);
+    int y0 = imax((int)floorf(cy - r - .5f), s->cy0), y1 = imin((int)ceilf(cy + r + .5f), s->cy1);
+    for (int py = y0; py < y1; py++) {
+        float dy = py + .5f - cy, ady = fabsf(dy);
+        float o2 = (r + .5f) * (r + .5f) - dy * dy;
+        if (o2 <= 0.f) continue;
+        float hwo = sqrtf(o2);
+        float i2 = r * r - (ady + .5f) * (ady + .5f);
+        float xi = i2 > 0.f ? sqrtf(i2) - .5f : -1.f;                    /* pixels whose centre is within xi of cx are fully inside */
+        int sL, sR;
+        if (xi > 0.f) { sL = (int)ceilf(cx - xi - .5f); sR = (int)floorf(cx + xi - .5f) + 1; if (sR < sL) sR = sL; }
+        else { sL = sR = (int)ceilf(cx - .5f); }
+        int L0 = (int)floorf(cx - hwo - .5f), R1 = (int)ceilf(cx + hwo + .5f);
+        uint16_t *row = s->px + (size_t)py * (size_t)s->w;
+        for (int pass = 0; pass < 2; pass++) {
+            int from = pass ? sR : L0, to = pass ? R1 : sL;
+            from = imax(from, s->cx0); to = imin(to, s->cx1);
+            for (int px = from; px < to; px++) {
+                float dx = px + .5f - cx;
+                int pa = (int)(clamp01(.5f - (sqrtf(dx * dx + dy * dy) - r)) * a + .5f);
+                if (pa <= 0) continue;
+                if (pa >= 255) row[px] = packed; else blend(&row[px], sr, sg, sb, pa);
+            }
+        }
+        int f = imax(sL, s->cx0), t = imin(sR, s->cx1);
+        if (a >= 255) for (int px = f; px < t; px++) row[px] = packed;
+        else for (int px = f; px < t; px++) blend(&row[px], sr, sg, sb, a);
+    }
+}
 
 void gfx_ring(Surf *s, float cx, float cy, float r, float thick, uint32_t c, int a) {
     if (r <= 0.f || a <= 0) return;

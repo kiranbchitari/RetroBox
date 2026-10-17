@@ -22,6 +22,7 @@ static retro_log_printf_t log_cb;
 
 static int width = 1280, height = 720;
 static int loaded;
+static const Game *cur;
 
 static void logf_(enum retro_log_level lvl, const char *msg) { if (log_cb) log_cb(lvl, "[originals] %s\n", msg); }
 
@@ -44,7 +45,7 @@ void retro_set_input_state(retro_input_state_t cb) { input_cb = cb; }
 
 unsigned retro_api_version(void) { return RETRO_API_VERSION; }
 void retro_init(void) {}
-void retro_deinit(void) { game_free(); loaded = 0; }
+void retro_deinit(void) { if (cur) cur->release(); cur = NULL; loaded = 0; }
 
 void retro_get_system_info(struct retro_system_info *info) {
     memset(info, 0, sizeof *info);
@@ -84,64 +85,83 @@ bool retro_load_game(const struct retro_game_info *game) {
     char head[256];
     size_t n = game->size < sizeof head - 1 ? game->size : sizeof head - 1;
     memcpy(head, game->data, n); head[n] = 0;
-    if (!strstr(head, "game=snake")) { logf_(RETRO_LOG_ERROR, "unknown game in cartridge"); return false; }
+    static const Game *const games[] = {&GAME_SNAKE, &GAME_BLIZZARD};
+    cur = NULL;
+    for (size_t i = 0; i < sizeof games / sizeof games[0]; i++) {
+        char want[64];
+        snprintf(want, sizeof want, "game=%s", games[i]->id);
+        if (strstr(head, want)) { cur = games[i]; break; }
+    }
+    if (!cur) { logf_(RETRO_LOG_ERROR, "unknown game in cartridge"); return false; }
 
     static const struct retro_input_descriptor desc[] = {
         {0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up"},
         {0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Down"},
         {0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Left"},
         {0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right"},
-        {0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Confirm"},
-        {0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Back"},
+        {0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Confirm / Shoot"},
+        {0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Back / Jump"},
         {0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Pause"},
+        {1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP, "Up"},
+        {1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN, "Down"},
+        {1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT, "Left"},
+        {1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "Right"},
+        {1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A, "Confirm / Shoot"},
+        {1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B, "Back / Jump"},
+        {1, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START, "Join / Pause"},
         {0, 0, 0, 0, NULL},
     };
     env_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, (void *)desc);
 
     pick_resolution();
-    if (!game_setup(width, height)) { logf_(RETRO_LOG_ERROR, "out of memory"); return false; }
+    if (!cur->setup(width, height)) { logf_(RETRO_LOG_ERROR, "out of memory"); return false; }
     snd_init(RATE);
-    game_reset();
+    cur->reset();
     loaded = 1;
     return true;
 }
 
 bool retro_load_game_special(unsigned type, const struct retro_game_info *info, size_t num) { (void)type; (void)info; (void)num; return false; }
 
-void retro_unload_game(void) { game_free(); loaded = 0; }
-void retro_reset(void) { if (loaded) game_reset(); }
+void retro_unload_game(void) { if (cur) cur->release(); cur = NULL; loaded = 0; }
+void retro_reset(void) { if (loaded) cur->reset(); }
 unsigned retro_get_region(void) { return RETRO_REGION_NTSC; }
 
-static int held(unsigned id) { return input_cb(0, RETRO_DEVICE_JOYPAD, 0, id) != 0; }
+static int held(unsigned port, unsigned id) { return input_cb(port, RETRO_DEVICE_JOYPAD, 0, id) != 0; }
 
-void retro_run(void) {
-    if (!loaded) return;
-    poll_cb();
-    Pad p = { (uint8_t)held(RETRO_DEVICE_ID_JOYPAD_UP), (uint8_t)held(RETRO_DEVICE_ID_JOYPAD_DOWN), (uint8_t)held(RETRO_DEVICE_ID_JOYPAD_LEFT),
-              (uint8_t)held(RETRO_DEVICE_ID_JOYPAD_RIGHT), (uint8_t)(held(RETRO_DEVICE_ID_JOYPAD_A) || held(RETRO_DEVICE_ID_JOYPAD_X)),
-              (uint8_t)(held(RETRO_DEVICE_ID_JOYPAD_B) || held(RETRO_DEVICE_ID_JOYPAD_Y)), (uint8_t)held(RETRO_DEVICE_ID_JOYPAD_START),
-              (uint8_t)held(RETRO_DEVICE_ID_JOYPAD_SELECT) };
+static Pad read_pad(unsigned port) {
+    Pad p = { (uint8_t)held(port, RETRO_DEVICE_ID_JOYPAD_UP), (uint8_t)held(port, RETRO_DEVICE_ID_JOYPAD_DOWN), (uint8_t)held(port, RETRO_DEVICE_ID_JOYPAD_LEFT),
+              (uint8_t)held(port, RETRO_DEVICE_ID_JOYPAD_RIGHT), (uint8_t)(held(port, RETRO_DEVICE_ID_JOYPAD_A) || held(port, RETRO_DEVICE_ID_JOYPAD_X)),
+              (uint8_t)(held(port, RETRO_DEVICE_ID_JOYPAD_B) || held(port, RETRO_DEVICE_ID_JOYPAD_Y)), (uint8_t)held(port, RETRO_DEVICE_ID_JOYPAD_START),
+              (uint8_t)held(port, RETRO_DEVICE_ID_JOYPAD_SELECT) };
     /* the left stick steers too (the dominant axis wins) */
-    int ax = input_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
-    int ay = input_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
+    int ax = input_cb(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
+    int ay = input_cb(port, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
     if (abs(ax) > 20000 || abs(ay) > 20000) {
         if (abs(ax) >= abs(ay)) { if (ax > 0) p.right = 1; else p.left = 1; }
         else { if (ay > 0) p.down = 1; else p.up = 1; }
     }
-    game_frame(&p);
+    return p;
+}
+
+void retro_run(void) {
+    if (!loaded) return;
+    poll_cb();
+    Pad pads[2] = { read_pad(0), read_pad(1) };
+    cur->frame(pads);
 
     static int16_t audio[(RATE / FPS) * 2];
     snd_mix(audio, RATE / FPS);
     audio_cb(audio, RATE / FPS);
-    video_cb(game_fb(), (unsigned)width, (unsigned)height, (size_t)width * 2);
+    video_cb(cur->fb(), (unsigned)width, (unsigned)height, (size_t)width * 2);
 }
 
-size_t retro_serialize_size(void) { return loaded ? game_state_size() : 0; }
-bool retro_serialize(void *data, size_t size) { return loaded && size >= game_state_size() && game_state_save(data); }
-bool retro_unserialize(const void *data, size_t size) { return loaded && game_state_load(data, size); }
+size_t retro_serialize_size(void) { return loaded ? cur->state_size() : 0; }
+bool retro_serialize(void *data, size_t size) { return loaded && size >= cur->state_size() && cur->state_save(data); }
+bool retro_unserialize(const void *data, size_t size) { return loaded && cur->state_load(data, size); }
 
-void *retro_get_memory_data(unsigned id) { size_t n; return id == RETRO_MEMORY_SAVE_RAM ? game_sram(&n) : NULL; }
-size_t retro_get_memory_size(unsigned id) { size_t n = 0; if (id == RETRO_MEMORY_SAVE_RAM) game_sram(&n); return n; }
+void *retro_get_memory_data(unsigned id) { size_t n; return (cur && id == RETRO_MEMORY_SAVE_RAM) ? cur->sram(&n) : NULL; }
+size_t retro_get_memory_size(unsigned id) { size_t n = 0; if (cur && id == RETRO_MEMORY_SAVE_RAM) cur->sram(&n); return n; }
 
 void retro_cheat_reset(void) {}
 void retro_cheat_set(unsigned index, bool enabled, const char *code) { (void)index; (void)enabled; (void)code; }

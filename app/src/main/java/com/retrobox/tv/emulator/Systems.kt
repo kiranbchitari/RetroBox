@@ -21,7 +21,8 @@ object Systems {
         // Games made for RetroBox itself (cores/originals): a tiny .rbo "cartridge" picks the game inside one core.
         SystemAdapter(Originals.SYSTEM_ID, "RetroBox Originals", setOf(Originals.EXTENSION), listOf(CoreSpec(Originals.CORE_ID, "RetroBox Originals", "GPL-2.0")),
             originalsButtons, SystemStatus.EXPERIMENTAL, "Built for RetroBox; not yet checked on a real TV",
-            buttonNames = mapOf(PadButton.A to "Confirm", PadButton.B to "Back", PadButton.START to "Pause"),
+            players = 2,
+            buttonNames = mapOf(PadButton.A to "Confirm / Shoot", PadButton.B to "Back / Jump", PadButton.START to "Pause / Join"),
             editorOrder = listOf(PadButton.A, PadButton.B, PadButton.START, PadButton.UP, PadButton.DOWN, PadButton.LEFT, PadButton.RIGHT), turboButtons = emptyList(), stickFourWay = true),
     )
 

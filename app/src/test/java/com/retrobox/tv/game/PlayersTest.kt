@@ -202,8 +202,8 @@ class PlayersTest {
         assertEquals(PadButton.B, ProfileResolver.resolve(DefaultMappings.gamepad, set, "snes", null, 0)[KeyEvent.KEYCODE_BUTTON_L2])
     }
 
-    @Test fun onlyNesAndSnesAreTwoPlayer() {
-        assertEquals(listOf("nes", "snes"), Systems.all.filter { it.players > 1 }.map { it.id })
+    @Test fun onlyNesSnesAndOriginalsAreTwoPlayer() {
+        assertEquals(listOf("nes", "snes", "originals"), Systems.all.filter { it.players > 1 }.map { it.id })
         assertTrue(Systems.all.all { it.players in 1..2 })
     }
 }

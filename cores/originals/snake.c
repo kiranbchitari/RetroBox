@@ -497,14 +497,14 @@ static void draw(void) {
 }
 
 /* ---- public ---- */
-void game_free(void) { free(fb.px); free(bg); fb.px = NULL; bg = NULL; }
+static void snake_release(void) { free(fb.px); free(bg); fb.px = NULL; bg = NULL; }
 
-int game_setup(int w, int h) {
-    game_free();
+static int snake_setup(int w, int h) {
+    snake_release();
     fb.w = w; fb.h = h;
     fb.px = (uint16_t *)calloc((size_t)w * h, sizeof(uint16_t));
     bg = (uint16_t *)calloc((size_t)w * h, sizeof(uint16_t));
-    if (!fb.px || !bg) { game_free(); return 0; }
+    if (!fb.px || !bg) { snake_release(); return 0; }
     gfx_clip_reset(&fb);
     S = (float)h / 720.f;
     cell = (int)(34.f * S); if (cell < 8) cell = 8;
@@ -516,7 +516,7 @@ int game_setup(int w, int h) {
     return 1;
 }
 
-void game_reset(void) {
+static void snake_reset(void) {
     if (!st.rng) st.rng = 0x9E3779B9u;
     sanitize_save();
     st.magic = STATE_MAGIC;
@@ -526,19 +526,20 @@ void game_reset(void) {
     st.row = 2;
 }
 
-void game_frame(const Pad *pad) {
+static void snake_frame(const Pad pads[2]) {
+    const Pad *pad = &pads[0];
     if (!synced) { sanitize_save(); st.mode = save.mode; st.speed = save.speed; synced = 1; }
     update(pad);
     draw();
 }
 
-const uint16_t *game_fb(void) { return fb.px; }
+static const uint16_t *snake_fb(void) { return fb.px; }
 
-size_t game_state_size(void) { return sizeof(State); }
+static size_t snake_state_size(void) { return sizeof(State); }
 
-int game_state_save(void *dst) { memcpy(dst, &st, sizeof st); return 1; }
+static int snake_state_save(void *dst) { memcpy(dst, &st, sizeof st); return 1; }
 
-int game_state_load(const void *src, size_t size) {
+static int snake_state_load(const void *src, size_t size) {
     if (size != sizeof(State)) return 0;
     State n; memcpy(&n, src, sizeof n);
     if (n.magic != STATE_MAGIC || n.len < 2 || n.len > COLS * ROWS || n.head < 0 || n.head >= RING || n.screen < 0 || n.screen > S_OVER) return 0;
@@ -557,4 +558,6 @@ int game_state_load(const void *src, size_t size) {
     return 1;
 }
 
-uint8_t *game_sram(size_t *size) { *size = sizeof save; return (uint8_t *)&save; }
+static uint8_t *snake_sram(size_t *size) { *size = sizeof save; return (uint8_t *)&save; }
+
+const Game GAME_SNAKE = {"snake", snake_setup, snake_release, snake_reset, snake_frame, snake_fb, snake_state_size, snake_state_save, snake_state_load, snake_sram};
