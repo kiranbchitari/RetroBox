@@ -87,7 +87,7 @@ data class PauseSettings(
     val fastForwardSpeed: Int = FastForward.DEFAULT,
     val turbo: Set<PadButton> = emptySet(),
     val turboChoices: List<Set<PadButton>> = listOf(emptySet()),
-    /** For button names in the Turbo row (Genesis calls RetroPad Y "A"). */
+    /** For button names in the Turbo row (a system may call a RetroPad button something else). */
     val systemId: String = "",
 )
 

@@ -27,12 +27,8 @@ snes9x2005|https://github.com/libretro/snes9x2005.git|a79dfe9047e7fec58808aefe48
 gambatte|https://github.com/libretro/gambatte-libretro.git|d9d6cd06382d1ced30de34d56d3609452323dab1
 gpsp|https://github.com/libretro/gpsp.git|5819380c2ffb0900219d700a382ee68c464ebb99
 mgba|https://github.com/libretro/mgba.git|7a12d6d4b9acb14c0ae62c9166b6a2f3d08007f6
-genesis_plus_gx|https://github.com/libretro/Genesis-Plus-GX.git|aa74d79634cd230f65cce4180e92688e53883d2f
-picodrive|https://github.com/libretro/picodrive.git|1890c2932234c9d30f4cd3851d02228baae8f09e
 '
 license_for() { case "$1" in fceumm) echo Copying;; gambatte|gpsp) echo COPYING;; mgba) echo LICENSE;; snes9x2005) echo copyright;;
-  genesis_plus_gx) echo LICENSE.txt;;  # covers the bundled components (Nuked OPN2, tremor, libchdr, ...) too
-  picodrive) echo COPYING pico/cd/libchdr/LICENSE.txt pico/sound/emu2413/LICENSE platform/common/dr_libs/LICENSE platform/common/tremor/COPYING;;
 esac; }
 
 # Each core's license text, with its source and commit, goes into the APK (assets/licenses/, see app/build.gradle.kts).
@@ -44,7 +40,7 @@ install_license() { # name repo sha
   } > "$OUT/licenses/core-$1.txt"
 }
 
-dirname_for() { case "$1" in gambatte) echo gambatte-libretro;; fceumm) echo libretro-fceumm;; genesis_plus_gx) echo Genesis-Plus-GX;; *) echo "$1";; esac; }
+dirname_for() { case "$1" in gambatte) echo gambatte-libretro;; fceumm) echo libretro-fceumm;; *) echo "$1";; esac; }
 
 fetch() { # name repo sha
   local dir="$SRC/$(dirname_for "$1")"
@@ -52,8 +48,6 @@ fetch() { # name repo sha
   if [ "$(git -C "$dir" rev-parse HEAD 2>/dev/null || true)" != "$3" ]; then
     git -C "$dir" fetch -q --depth 1 origin "$3"; git -C "$dir" checkout -q FETCH_HEAD
   fi
-  # picodrive keeps libchdr, emu2413, dr_libs (and the unused cyclone/libpicofe) in submodules pinned by its commit.
-  [ -f "$dir/.gitmodules" ] && git -C "$dir" submodule update -q --init --depth 1
   return 0
 }
 
@@ -73,14 +67,6 @@ build_core() {
   echo "==> $name @ $(git -C "$dir" rev-parse --short HEAD)"
   case "$name" in
     fceumm|snes9x2005|gpsp) ndk_build_jni "$name" "$dir" ;;
-    genesis_plus_gx|picodrive)
-      # Upstream jni/Android.mk (APP_ABI := all) through a wrapper Application.mk that pins our ABIs/API/page size.
-      # picodrive uses its portable C CPU cores (FAME 68k, CZ80) on both ABIs, as upstream's Android.mk does;
-      # the ARM-asm Cyclone/DrZ80 path is not enabled (untestable here, see cores/GENESIS_HANDOVER.md).
-      local jni="$dir/jni"; [ "$name" = genesis_plus_gx ] && jni="$dir/libretro/jni"
-      ( cd "$jni" && "$NDK/ndk-build" -j"$JOBS" NDK_PROJECT_PATH="$OUT/$name" NDK_OUT="$OUT/$name/obj" NDK_LIBS_OUT="$OUT/$name/libs" \
-          APP_BUILD_SCRIPT="$jni/Android.mk" NDK_APPLICATION_MK="$HERE/mk/genesis/Application.mk" >/dev/null )
-      for abi in $ABIS; do install_so "$name" "$abi" "$OUT/$name/libs/$abi/libretro.so"; done ;;
     gambatte)
       "$NDK/ndk-build" -j"$JOBS" NDK_PROJECT_PATH="$OUT/gambatte" NDK_OUT="$OUT/gambatte/obj" NDK_LIBS_OUT="$OUT/gambatte/libs" \
         APP_BUILD_SCRIPT="$HERE/mk/gambatte/Android.mk" NDK_APPLICATION_MK="$HERE/mk/gambatte/Application.mk" GAMBATTE_SRC="$dir" >/dev/null

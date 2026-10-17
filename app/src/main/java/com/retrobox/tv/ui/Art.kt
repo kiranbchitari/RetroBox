@@ -50,7 +50,6 @@ fun ConsoleIcon(systemId: String, modifier: Modifier = Modifier) {
             "gb" -> drawGameBoy(body = Color(0xFFC4C7BE), screen = Color(0xFF9BBC0F), bezel = Color(0xFF50545E), buttons = Color(0xFFA8305A))
             "gbc" -> drawGameBoy(body = Color(0xFF7B52D8), screen = Color(0xFF38C6B4), bezel = Color(0xFF1B1F2E), buttons = Color(0xFF2C2F3D))
             "gba" -> drawGba()
-            "genesis" -> drawGenesis()
             "originals" -> drawOriginals()
             else -> drawNes()
         }
@@ -58,20 +57,25 @@ fun ConsoleIcon(systemId: String, modifier: Modifier = Modifier) {
 }
 
 /** Aspect ratio (width / height) the icon of [systemId] is drawn for. */
-fun consoleIconAspect(systemId: String) = when (systemId) { "gb", "gbc" -> 0.62f; "nes" -> 1.9f; "snes" -> 1.75f; "gba" -> 1.7f; "genesis" -> 1.75f; else -> 1.5f }
+fun consoleIconAspect(systemId: String) = when (systemId) { "gb", "gbc" -> 0.62f; "nes" -> 1.9f; "snes" -> 1.75f; "gba" -> 1.7f; "originals" -> 1.6f; else -> 1.5f }
 
-/** RetroBox Originals: a small game screen with the snake and its apple. */
+/** RetroBox Originals: a grey PS5-style controller (two grips, dark centre with touchpad, D-pad, four face buttons, two sticks). */
 private fun DrawScope.drawOriginals() {
-    box(0.1f, 0.04f, 0.8f, 0.92f, 0.12f, Color(0xFF2B5566))
-    box(0.14f, 0.1f, 0.72f, 0.8f, 0.09f, Color(0xFF0B2530))
-    val body = Color(0xFF3DDC97)
-    box(0.24f, 0.62f, 0.5f, 0.12f, 0.05f, body)
-    box(0.62f, 0.32f, 0.12f, 0.42f, 0.05f, body)
-    box(0.3f, 0.32f, 0.44f, 0.12f, 0.05f, Color(0xFF2DB87E))
-    box(0.24f, 0.28f, 0.14f, 0.2f, 0.07f, Color(0xFF96FFC4))
-    dot(0.29f, 0.34f, 0.025f, Color(0xFF0B2530))
-    dot(0.29f, 0.43f, 0.025f, Color(0xFF0B2530))
-    dot(0.4f, 0.68f, 0.05f, Color(0xFFFF4D6D))
+    val body = Color(0xFFD9DCE3); val shade = Color(0xFF8F95A3); val dark = Color(0xFF1B1D26); val grey = Color(0xFF444855)
+    dot(0.19f, 0.62f, 0.31f, shade); dot(0.81f, 0.62f, 0.31f, shade)
+    box(0.04f, 0.12f, 0.92f, 0.6f, 0.3f, shade)
+    dot(0.19f, 0.6f, 0.29f, body); dot(0.81f, 0.6f, 0.29f, body)
+    box(0.05f, 0.12f, 0.9f, 0.55f, 0.27f, body)
+    box(0.3f, 0.12f, 0.4f, 0.56f, 0.14f, dark)                                   // dark centre
+    box(0.375f, 0.17f, 0.25f, 0.14f, 0.04f, Color(0xFF3A3E4C))                   // touchpad
+    box(0.365f, 0.17f, 0.01f, 0.14f, 0.005f, Color(0xFF4D8DFF)); box(0.625f, 0.17f, 0.01f, 0.14f, 0.005f, Color(0xFF4D8DFF))   // light bar
+    dpad(0.2f, 0.4f, 0.13f, 0.085f, grey)
+    val bx = 0.8f; val by = 0.4f; val dx = 0.056f; val dy = 0.09f; val r = 0.058f
+    dot(bx, by - dy, r, grey); dot(bx, by + dy, r, grey); dot(bx - dx, by, r, grey); dot(bx + dx, by, r, grey)
+    dot(bx, by - dy, 0.026f, Color(0xFF3DDC97)); dot(bx + dx, by, 0.026f, Color(0xFFFF5A6E))      // triangle, circle
+    dot(bx, by + dy, 0.026f, Color(0xFF6AA5FF)); dot(bx - dx, by, 0.026f, Color(0xFFFF8AD8))      // cross, square
+    dot(0.41f, 0.62f, 0.1f, Color(0xFF0F1015)); dot(0.41f, 0.62f, 0.062f, grey)
+    dot(0.59f, 0.62f, 0.1f, Color(0xFF0F1015)); dot(0.59f, 0.62f, 0.062f, grey)
 }
 
 private fun DrawScope.drawNes() {
@@ -91,19 +95,6 @@ private fun DrawScope.drawSnes() {
     val r = 0.085f
     dot(0.88f, 0.5f, r, Color(0xFFE0344B)); dot(0.76f, 0.5f, r, Color(0xFF3DDC84))
     dot(0.82f, 0.32f, r, Color(0xFF3B82F6)); dot(0.82f, 0.68f, r, Color(0xFFF2C230))
-}
-
-/** A generic black six-button pad (rounded body with two grips, round D-pad, A B C below X Y Z). */
-private fun DrawScope.drawGenesis() {
-    val body = Color(0xFF3A3D48)
-    box(0.06f, 0.18f, 0.88f, 0.56f, 0.28f, body)
-    dot(0.2f, 0.56f, 0.4f, body); dot(0.8f, 0.56f, 0.4f, body)
-    dot(0.22f, 0.5f, 0.27f, Color(0xFF4B4F5C))
-    dpad(0.22f, 0.5f, 0.17f, 0.11f, Color(0xFF101115))
-    box(0.45f, 0.4f, 0.1f, 0.06f, 0.03f, Color(0xFF6B6F7A))   // Start
-    val small = 0.065f; val big = 0.095f
-    dot(0.64f, 0.38f, small, Color(0xFF8A8F9B)); dot(0.75f, 0.33f, small, Color(0xFF8A8F9B)); dot(0.86f, 0.3f, small, Color(0xFF8A8F9B))
-    dot(0.62f, 0.6f, big, Color(0xFF55586A)); dot(0.75f, 0.54f, big, Color(0xFF55586A)); dot(0.88f, 0.5f, big, Color(0xFF55586A))
 }
 
 private fun DrawScope.drawGameBoy(body: Color, screen: Color, bezel: Color, buttons: Color) {

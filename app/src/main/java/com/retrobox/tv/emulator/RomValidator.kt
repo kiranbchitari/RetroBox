@@ -25,7 +25,6 @@ object RomValidator {
                 "snes" -> snesHeaderOk(rom)
                 "gb", "gbc" -> gbHeaderOk(rom)
                 "gba" -> gbaHeaderOk(rom)
-                "genesis" -> genesisHeaderOk(rom)
                 Originals.SYSTEM_ID -> Originals.isCartridge(readAt(rom, 0, Originals.MAGIC.size))
                 else -> true
             }
@@ -38,7 +37,6 @@ object RomValidator {
             "snes" -> "a recognisable SNES ROM (no valid cartridge header found)"
             "gb", "gbc" -> "a valid Game Boy ROM (no Nintendo logo / header checksum)"
             "gba" -> "a valid GBA ROM (bad header)"
-            "genesis" -> "a Genesis / Mega Drive ROM (no \"SEGA\" header)"
             Originals.SYSTEM_ID -> "a RetroBox Originals cartridge (no RBO1 header)"
             else -> "a valid ROM"
         }
@@ -96,19 +94,6 @@ object RomValidator {
     }
 
     /** GBA: fixed byte 0x96 at 0xB2 or a valid header complement at 0xBD. */
-    /** "SEGA" at 0x100 (or 0x101, some dumps pad the system name); an interleaved .smd copier dump is recognised by its 512-byte header. */
-    internal fun genesisHeaderOk(rom: File): Boolean {
-        val head = readAt(rom, 0, 0x104) ?: return false
-        if (looksLikeGenesis(head)) return true
-        return rom.extension.equals("smd", ignoreCase = true) && rom.length() % 0x4000 == 0x200L && u8(head, 8) == 0xAA && u8(head, 9) == 0xBB
-    }
-
-    /** True when [head] (at least 0x104 bytes from the start of a file) has the Genesis "SEGA" system name. */
-    fun looksLikeGenesis(head: ByteArray): Boolean {
-        fun at(o: Int) = head.size >= o + 4 && String(head, o, 4, Charsets.US_ASCII) == "SEGA"
-        return at(0x100) || at(0x101)
-    }
-
     internal fun gbaHeaderOk(rom: File): Boolean {
         val h = readAt(rom, 0, 0xC0) ?: return false
         var x = 0

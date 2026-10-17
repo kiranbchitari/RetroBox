@@ -73,8 +73,7 @@ compile and link for `armeabi-v7a` and `arm64-v8a` using `cores/build-cores.sh` 
 | gpSP | GBA (fast, ARM dynarec) | libretro/gpsp `5819380` | upstream `jni/Android.mk` | GPL-2.0 | 0.6 / 0.7 MB |
 
 "Builds" is not "runs correctly": nothing here counts as playable until it has been loaded with a ROM
-on a device (see TEST_MATRIX.md). Planned (not built yet): genesis_plus_gx (non-commercial license),
-pcsx_rearmed (GPL-2.0), mupen64plus-next / parallel_n64, melonDS/DeSmuME.
+on a device (see TEST_MATRIX.md). Planned (not built yet): pcsx_rearmed (GPL-2.0), mupen64plus-next / parallel_n64, melonDS/DeSmuME.
 
 Default core choices (revisit with measurements on the real TV):
 
@@ -88,7 +87,6 @@ Default core choices (revisit with measurements on the real TV):
 * App code: **GPL-2.0** (`LICENSE`, added in Milestone 7), so it can sit next to GPLv2-only cores such as gambatte (MPL-2.0 mGBA is compatible with GPLv2). This is a working decision, not legal advice, and I did not audit every upstream file header.
 * Cores are loaded with `dlopen` as separate `.so` files and each retains its own license; the APK carries `assets/licenses/` (Milestone 7): the app's license, `THIRD_PARTY_NOTICES.md`, and each core's license text with its repository and pinned commit, shown under Settings → About & licenses.
 * **RetroBox Originals** (`cores/originals`, our own GPL-2.0 code, not fetched): games written for RetroBox as one libretro core, started by a tiny `.rbo` cartridge. The core renders RGB565 at 960x540, 1280x720 or 1920x1080; the app picks the size from the screen height before the game loads (`Originals.resolutionFor`) and defaults the system to plain, smoothed, original-aspect output instead of the global CRT looks. Details in `cores/originals/README.md`.
-* **Genesis Plus GX and PicoDrive (Genesis) are non-commercial (MAME-style) too:** never sell or bundle an APK containing them; `-Pretrobox.excludeCores=genesis_plus_gx,picodrive` leaves them out.
 * **snes9x2005's non-commercial terms conflict with GPL redistribution.** It is fine for personal sideloading on your own TV; do not publish an APK containing it. A distributable build leaves it out with `-Pretrobox.excludeCores=snes9x2005`.
 * No ROMs, BIOS, or artwork are bundled. No firmware is required for the Priority-1 systems (gpSP ships a built-in GBA BIOS, mGBA uses HLE); firmware a future core needs would be user-supplied into the app's `system` directory.
 

@@ -60,16 +60,6 @@ class ZipRomTest {
         try { ZipRom.extract(ByteArrayInputStream(zipBytes("x.sfc" to byteArrayOf(1))), "y.sfc", out, 4096); fail() } catch (e: IOException) { assertTrue(e.message!!.contains("no longer")) }
     }
 
-    @Test fun zippedBinNeedsTheGenesisHeader() {
-        val genesis = ByteArray(0x200).also { "SEGA MEGA DRIVE ".toByteArray().copyInto(it, 0x100) }
-        val chips = zipBytes("a.bin" to ByteArray(0x200), "b.bin" to ByteArray(0x300))   // an arcade romset: chip dumps
-        assertNull(ZipRom.firstRom(ByteArrayInputStream(chips)))
-        assertEquals("game.bin", ZipRom.firstRom(ByteArrayInputStream(zipBytes("chip.bin" to ByteArray(0x200), "game.bin" to genesis)))!!.path)
-        val f = zipFile("set.zip", "chip.bin" to ByteArray(0x200), "game.bin" to genesis)
-        assertEquals("game.bin", ZipRom.firstRom(f)!!.path)   // the directory-based reader agrees
-        assertNull(ZipRom.firstRom(zipFile("chips.zip", "a.bin" to ByteArray(0x200))))
-    }
-
     @Test fun twoZipsWithTheSameInnerNameGetTheirOwnNames() {
         val root = tmp.newFolder("hacks")
         File(root, "Hack One.zip").writeBytes(zipBytes("rom.nes" to ByteArray(64)))

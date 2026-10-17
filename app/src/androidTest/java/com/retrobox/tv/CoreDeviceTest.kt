@@ -36,8 +36,6 @@ class CoreDeviceTest(private val systemId: String, private val coreId: String, p
             arrayOf("gbc", "gambatte", "rb-testrom.gbc"),
             arrayOf("gba", "gpsp", "rb-testrom.gba"),
             arrayOf("gba", "mgba", "rb-testrom.gba"),
-            arrayOf("genesis", "genesis_plus_gx", "rb-testrom.md"),
-            arrayOf("genesis", "picodrive", "rb-testrom.md"),
         )
 
         private val A = TestRoms.bit(PadButton.A.retroId)
@@ -82,8 +80,7 @@ class CoreDeviceTest(private val systemId: String, private val coreId: String, p
         val idle = picture()
         val (w, h) = idle[0] to idle[1]
         val sizes = mapOf("nes" to setOf(256 to 224, 256 to 240), "snes" to setOf(256 to 224, 256 to 239, 512 to 224, 512 to 448),
-            "gb" to setOf(160 to 144), "gbc" to setOf(160 to 144), "gba" to setOf(240 to 160),
-            "genesis" to setOf(320 to 224, 256 to 224, 320 to 240))
+            "gb" to setOf(160 to 144), "gbc" to setOf(160 to 144), "gba" to setOf(240 to 160))
         assertTrue("unexpected frame size ${w}x$h", (w to h) in sizes.getValue(systemId))
         assertTrue("picture has a single colour", idle.drop(2).distinct().size > 1)
 

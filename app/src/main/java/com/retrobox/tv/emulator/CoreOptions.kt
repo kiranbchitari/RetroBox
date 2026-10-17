@@ -7,18 +7,6 @@ object CoreOptions {
     fun forGame(core: CoreSpec, rom: File, screenHeightPx: Int = 0): Map<String, String> = when (core.id) {
         // RetroBox Originals draws at the size of the screen it will be shown on (it is vector-style, so any size looks sharp).
         Originals.CORE_ID -> mapOf(Originals.RESOLUTION_OPTION to Originals.resolutionFor(screenHeightPx))
-        // Genesis Plus GX picks a 6-button pad from the ROM header by itself ("joypad auto"); PicoDrive always assumes
-        // 3 buttons, which hides X/Y/Z/Mode from games that use them. Same rule as GPGX: a '6' in the header's I/O field.
-        "picodrive" -> if (genesisWantsSixButtons(rom)) mapOf("picodrive_input1" to "6 button pad", "picodrive_input2" to "6 button pad") else emptyMap()
         else -> emptyMap()
     }
-
-    /** The Genesis header's I/O support field (0x190-0x19F) lists '6' for games that know the 6-button pad. */
-    fun genesisWantsSixButtons(rom: File): Boolean = runCatching {
-        java.io.RandomAccessFile(rom, "r").use { f ->
-            if (f.length() < 0x1A0) return false
-            val io = ByteArray(16); f.seek(0x190); f.readFully(io)
-            io.any { it == '6'.code.toByte() }
-        }
-    }.getOrDefault(false)
 }

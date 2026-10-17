@@ -27,7 +27,7 @@ data class SystemAdapter(
     val statusNote: String,
     /** How many people can play on one device (libretro ports the host feeds). Game Boy-family cores here have no link cable, so 1. */
     val players: Int = 1,
-    /** What the system calls each RetroPad button, where it differs (Genesis: RetroPad Y is "A", A is "C", …). */
+    /** What the system calls each RetroPad button, where it differs (RetroBox Originals: A is "Confirm", B is "Back", …). */
     val buttonNames: Map<PadButton, String> = emptyMap(),
     /** Order of the rows in the controls editor. */
     val editorOrder: List<PadButton> = listOf(PadButton.A, PadButton.B, PadButton.X, PadButton.Y, PadButton.L, PadButton.R, PadButton.START, PadButton.SELECT, PadButton.UP, PadButton.DOWN, PadButton.LEFT, PadButton.RIGHT),

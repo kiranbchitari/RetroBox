@@ -38,8 +38,6 @@ Everything below was written from what the app does on an **Android TV emulator*
 | A folder is marked "not available" | Its USB drive is unplugged or its permission was revoked. Its games are kept and marked missing, and they come back after a rescan with the drive plugged in. Removing the folder forgets its games and their favourite marks. |
 | "… is not a SNES ROM / may be corrupt" | The header check failed: wrong extension for the system, a truncated download, or a different format. The message names the file. Bad-checksum ROM hacks are accepted on purpose. |
 | "Emulator core '…' is not installed in this build" | That core was left out of this APK. Either `cores/build-cores.sh` was not run before building, or the build used `-Pretrobox.excludeCores=…` (for example, a build without Snes9x 2005). |
-| A Genesis `.bin` is not listed | Only a `.bin` with the Genesis "SEGA" header is listed (other systems use `.bin`). Rename a real Genesis ROM to `.md` or `.gen` if its header is unusual. Mega CD `.cue/.bin` and 32X games are not supported. |
-| Genesis game ignores X / Y / Z / Mode | The game is running with a 3-button pad: the 6-button pad is only used when the game's header lists it (some old games break with 6 buttons). |
 | "Could not unpack … from ….zip" | The zip is damaged or its ROM is larger than 64 MB unpacked. Re-download it, or unzip it on a computer and copy the ROM instead. |
 | Picture is a frozen frame on Home | That is the last frame saved when you paused or quit. Put your own cover at `Android/data/<package>/files/artwork/<system>/<rom name>.png` to replace it. |
 

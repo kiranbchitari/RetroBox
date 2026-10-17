@@ -85,7 +85,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                     Column(Modifier.width(640.dp).verticalScroll(rememberScrollState()).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                         MenuNote("RetroBox TV is free software under the GNU GPL, version 2. Each emulator core keeps its own license. No games, BIOS files or artwork are included: play only games you own.")
-                        MenuNote("Snes9x 2005, Genesis Plus GX and PicoDrive may only be shared non-commercially. Do not sell or publish a build that contains them.", RB.Warn)
+                        MenuNote("Snes9x 2005 may only be shared non-commercially. Do not sell or publish a build that contains it.", RB.Warn)
                         if (files.isEmpty()) MenuNote("No license files were packaged in this build.", RB.Warn)
                         files.forEach { f ->
                             MenuRow(MenuGlyph.LOAD, Color(0xFF8E9BFF), licenseTitle(f), Modifier.focusRequester(req(f))) { lastOpened = f; open = f }

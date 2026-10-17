@@ -65,9 +65,9 @@ Left open: any real controller, real two-player games, SNES port-2 run, keyboard
 ## After Milestone 7: zip ROMs, fast-forward/turbo, Genesis, review fixes (see TEST_MATRIX.md)
 * **Zip:** `ZipRom` (keys `zip:<container>!/<entry>`), scanner peeks inside zips (directory read for local files), `RomAccess` unpacks to the one-ROM cache (64 MB cap). Saves/pictures use the inner ROM's name (zip-derived when two zips clash).
 * **Fast-forward / turbo:** `EmulationSession.speed` (2×/3×/4×/Max, sound muted) via R2 / Space / analog trigger hold or the pause menu's Speed & Turbo page; per-system turbo buttons pulsed 3 on / 3 off on the emulation thread.
-* **Genesis:** Genesis Plus GX (default) and PicoDrive built by a separate session (`cores/GENESIS_HANDOVER.md`), `.md .gen .smd .bin` with a header check for `.bin`, two players, Genesis button names in the controls editor and turbo, PicoDrive 6-button pad from the header (`CoreOptions`). Both cores are non-commercial.
+* **Genesis:** built here and later removed again (2026-10-17): cores, `.md .gen .smd .bin` handling, tests and test ROM are gone.
 * **Whole-app review:** 18 defects fixed (list in TEST_MATRIX.md). JVM tests 188, on-device tests 30 (then, with Delete game: JVM 206, on-device 31).
-Left open: Genesis 6-button pad and real games, PicoDrive's ARM-assembly cores (faster on 32-bit TVs, not enabled), `.7z`, fast-forward with a real controller, every game-screen race reproduced on a device.
+Left open: `.7z`, fast-forward with a real controller, every game-screen race reproduced on a device.
 
 ## Milestone 7 — Packaging and validation (see TEST_MATRIX.md)
 Built:

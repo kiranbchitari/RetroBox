@@ -57,7 +57,7 @@ class LibraryScanner(private val walkerFor: (LibraryFolder) -> RomWalker) {
                 seen++
                 val system = Systems.detect(name)
                 if (system != null && size > 0) {
-                    if (!needsHeaderPeek(name) || headerSaysGenesis(walker, path)) roms += ScannedRom(system.id, path, name, titleFromFileName(name), size)
+                    roms += ScannedRom(system.id, path, name, titleFromFileName(name), size)
                 } else if (ZipRom.isZip(name) && size > 0) {
                     zipRom(walker, path, size)?.let { roms += it; zipNames[it.path] = name }
                 }
@@ -86,17 +86,6 @@ class LibraryScanner(private val walkerFor: (LibraryFolder) -> RomWalker) {
         onProgress(seen, result.size)
         return ScanOutcome.Found(result.sortedBy { it.path }, seen)
     }
-
-    /** `.bin` is used by many systems; only a file with the Genesis header is listed as a Genesis game. */
-    private fun needsHeaderPeek(name: String) = name.endsWith(".bin", ignoreCase = true)
-
-    private fun headerSaysGenesis(walker: RomWalker, path: String): Boolean = try {
-        walker.open(path).use { input ->
-            val head = ByteArray(0x104); var n = 0
-            while (n < head.size) { val r = input.read(head, n, head.size - n); if (r < 0) break; n += r }
-            n == head.size && com.retrobox.tv.emulator.RomValidator.looksLikeGenesis(head)
-        }
-    } catch (e: java.io.IOException) { false } catch (e: SecurityException) { false }
 
     /** The game inside a zip, or null (no supported ROM, or the file is not a readable zip: skipped, not fatal). */
     private fun zipRom(walker: RomWalker, path: String, zipSize: Long): ScannedRom? {

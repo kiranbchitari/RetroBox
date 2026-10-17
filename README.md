@@ -1,6 +1,6 @@
 # RetroBox TV
 
-An Android TV retro-gaming frontend that runs libretro emulator cores (it contains no home-made emulators). Target: Xiaomi Mi TV 4A with a Bluetooth gamepad. Systems: NES, SNES, Game Boy, Game Boy Color, Game Boy Advance (two cores) and Sega Genesis / Mega Drive (two cores), plus **RetroBox Originals**, games made for RetroBox itself (Snake first, `cores/originals/`). `.zip` ROMs, fast-forward and turbo buttons are supported.
+An Android TV retro-gaming frontend that runs libretro emulator cores (it contains no home-made emulators). Target: Xiaomi Mi TV 4A with a Bluetooth gamepad. Systems: NES, SNES, Game Boy, Game Boy Color, Game Boy Advance (two cores), plus **RetroBox Originals**, games made for RetroBox itself (Snake first, `cores/originals/`). `.zip` ROMs, fast-forward and turbo buttons are supported.
 
 * `INSTALL.md`: build, sign, install (ADB / USB), ROM folders, controller pairing, on-device tests
 * `TROUBLESHOOTING.md`: symptoms and what to try
@@ -15,7 +15,7 @@ cores/build-cores.sh && ./gradlew assembleDebug     # details in INSTALL.md
 
 ## Current state
 
-Milestones 1–7 are built, plus zip ROMs, fast-forward/turbo, Genesis and RetroBox Originals (Snake). **Everything was verified on an Android TV emulator (API 36, arm64) only.** Nothing has run on the Mi TV, no physical controller was used, and no one has heard the sound. The SNES, Game Boy, GBC, GBA and Genesis cores have played only this repo's original test ROMs, not real games (NES and SNES also ran user-supplied games). Automated checks: 219 JVM unit tests, a native layout test, and 36 on-device tests (`tools/run-device-tests.sh`), all passing on the emulator.
+Milestones 1–7 are built, plus zip ROMs, fast-forward/turbo and RetroBox Originals (Snake). Genesis was added and then removed again (2026-10-17). **Everything was verified on an Android TV emulator (API 36, arm64) only.** Nothing has run on the Mi TV, no physical controller was used, and no one has heard the sound. The SNES, Game Boy, GBC and GBA cores have played only this repo's original test ROMs, not real games (NES and SNES also ran user-supplied games). Automated checks: 213 JVM unit tests, a native layout test, and 32 on-device tests (`tools/run-device-tests.sh`), all passing on the emulator.
 
 ## Not implemented
 
@@ -35,6 +35,6 @@ Milestones 1–7 are built, plus zip ROMs, fast-forward/turbo, Genesis and Retro
 * Any real gamepad, including the Cosmic Byte Stratos Xenon. Two-player was tested only with two virtual gamepads, and SNES port 2 never ran.
 * Audible sound. Samples reach Android's audio output; nobody has listened.
 * The system folder picker, unplugging a USB drive, and a controller disconnecting, all on a real device.
-* Real SNES, Game Boy, Game Boy Color, GBA and Genesis games; Genesis 6-button pads in the app (only checked in a desktop harness); `.smd` files.
+* Real SNES, Game Boy, Game Boy Color and GBA games.
 * Fast-forward and turbo with a real controller (R2 / trigger) — tested with injected key events and the pause menu only.
 * Sideloading from a USB stick on the TV.

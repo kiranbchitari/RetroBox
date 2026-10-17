@@ -88,6 +88,9 @@ sealed interface Screen {
     data class Mapping(val scope: com.retrobox.tv.profile.ProfileScope) : Screen
 }
 
+/** System cards per row on Home. */
+private const val SYSTEMS_PER_ROW = 3
+
 @Composable
 fun HomeScreen(
     recent: List<RecentGame>,
@@ -132,9 +135,15 @@ fun HomeScreen(
             }
 
             SectionLabel("YOUR SYSTEMS", RB.Cyan)
-            Row(Modifier.fillMaxWidth().height(92.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Systems.all.forEach { s ->
-                    SystemTile(s, gamesPerSystem[s.id] ?: 0, Modifier.weight(1f).fillMaxHeight().focusRequester(req("sys:${s.id}")), onFocus = { onFocused("sys:${s.id}") }) { onSystem(s) }
+            // Three cards per row: each card has room for a big picture and the full name ("Game Boy Advance", "RetroBox Originals").
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Systems.all.chunked(SYSTEMS_PER_ROW).forEach { rowSystems ->
+                    Row(Modifier.fillMaxWidth().height(88.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        rowSystems.forEach { s ->
+                            SystemTile(s, gamesPerSystem[s.id] ?: 0, Modifier.weight(1f).fillMaxHeight().focusRequester(req("sys:${s.id}")), onFocus = { onFocused("sys:${s.id}") }) { onSystem(s) }
+                        }
+                        repeat(SYSTEMS_PER_ROW - rowSystems.size) { Spacer(Modifier.weight(1f)) }   // a short last row keeps the same card width
+                    }
                 }
             }
 
@@ -295,19 +304,18 @@ private fun SystemTile(s: SystemAdapter, games: Int, modifier: Modifier, onFocus
         SystemStatus.PLANNED -> "PLANNED" to RB.Muted
     }
     DashCard(onClick, modifier, enabled = s.status != SystemStatus.PLANNED, onFocus = onFocus) {
-        // Six systems share the row (about 138 dp each at 960 dp): a narrow icon column leaves room for "Game Boy" and "PLAYABLE".
-        Row(Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             val aspect = consoleIconAspect(s.id)
-            Box(Modifier.width(40.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
+            Box(Modifier.width(76.dp).fillMaxHeight(), contentAlignment = Alignment.Center) {
                 ConsoleIcon(s.id, if (aspect >= 1f) Modifier.fillMaxWidth().aspectRatio(aspect) else Modifier.fillMaxHeight(0.95f).aspectRatio(aspect))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                Text(s.displayName, fontSize = 14.sp, lineHeight = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(if (games == 1) "1 GAME" else "$games GAMES", fontSize = 10.sp, letterSpacing = 1.sp, color = RB.Muted, maxLines = 1)
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 3.dp)) {
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(color))
+                Text(s.displayName, fontSize = 17.sp, lineHeight = 20.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(if (games == 1) "1 GAME" else "$games GAMES", fontSize = 11.sp, letterSpacing = 1.sp, color = RB.Muted, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(color))
                     // No wrapping: with a TV safe area the tile narrows, and a wrapped status label would be clipped away.
-                    Text("  $label", fontSize = 10.sp, letterSpacing = 0.5.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1, softWrap = false)
+                    Text("  $label", fontSize = 11.sp, letterSpacing = 0.5.sp, fontWeight = FontWeight.Bold, color = color, maxLines = 1, softWrap = false)
                 }
             }
         }

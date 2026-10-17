@@ -67,7 +67,7 @@ internal fun buttonsFor(scope: ProfileScope): List<PadButton> {
     return sys.editorOrder.filter { it in has }
 }
 
-/** A button's name at this level: the system's own name (Genesis "C" for RetroPad A) for a system or game, the RetroPad name for all systems. */
+/** A button's name at this level: the system's own name ("Confirm" for RetroPad A in RetroBox Originals) for a system or game, the RetroPad name for all systems. */
 internal fun buttonName(scope: ProfileScope, b: PadButton): String = when (scope) {
     ProfileScope.Global -> b.label
     is ProfileScope.System -> Systems.byId(scope.systemId)?.nameOf(b) ?: b.label

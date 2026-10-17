@@ -8,7 +8,7 @@ import java.util.zip.ZipInputStream
 
 /**
  * ROMs inside `.zip` files. A zip counts as a game when one of its entries has a supported extension; the first such
- * entry (archive order, ignoring folders, hidden files and `__MACOSX`; a `.bin` only with the Genesis header) is the
+ * entry (archive order, ignoring folders, hidden files and `__MACOSX`) is the
  * game, so a zip holding one ROM plus a readme works. The library stores it as `zip:<zip path or URI>!/<entry path>` and
  * uses the entry's own file name for the title, saves and pictures, so unzipping the game later keeps its saves.
  */
@@ -32,16 +32,6 @@ object ZipRom {
         return key.substring(PREFIX.length, i) to key.substring(i + SEPARATOR.length)
     }
 
-    /** A `.bin` is shared by many systems: inside a zip it only counts with the Genesis header (as on disk). */
-    private fun binOk(name: String, head: () -> ByteArray): Boolean =
-        !name.endsWith(".bin", ignoreCase = true) || com.retrobox.tv.emulator.RomValidator.looksLikeGenesis(head())
-
-    private fun readHead(input: InputStream): ByteArray {
-        val head = ByteArray(0x104); var n = 0
-        while (n < head.size) { val r = input.read(head, n, head.size - n); if (r < 0) break; n += r }
-        return if (n == head.size) head else head.copyOf(n)
-    }
-
     private fun usable(path: String): Boolean {
         val name = path.substringAfterLast('/')
         return !path.startsWith("__MACOSX/") && !name.startsWith(".") && Systems.detect(name) != null
@@ -49,13 +39,13 @@ object ZipRom {
 
     /** The game entry of a zip, or null when it holds no supported ROM. Reads entry headers only as far as needed. */
     fun firstRom(input: InputStream): Entry? = ZipInputStream(input.buffered()).use { zip ->
-        generateSequence { zip.nextEntry }.firstOrNull { !it.isDirectory && usable(it.name) && binOk(it.name) { readHead(zip) } }?.let { Entry(it.name, it.size) }
+        generateSequence { zip.nextEntry }.firstOrNull { !it.isDirectory && usable(it.name) }?.let { Entry(it.name, it.size) }
     }
 
     /** Same, for a file on disk: reads the zip's directory instead of inflating every entry before the ROM. */
     fun firstRom(file: File): Entry? = java.util.zip.ZipFile(file).use { zip ->
         zip.entries().asSequence().firstOrNull { e ->
-            !e.isDirectory && usable(e.name) && binOk(e.name) { zip.getInputStream(e).use { readHead(it) } }
+            !e.isDirectory && usable(e.name)
         }?.let { Entry(it.name, it.size) }
     }
 
