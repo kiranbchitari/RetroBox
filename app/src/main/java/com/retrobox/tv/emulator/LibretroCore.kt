@@ -43,6 +43,8 @@ class LibretroCore private constructor(
         private val nativeLibDir: File,
         private val systemDir: File,
         private val saveDir: File,
+        /** Height of the screen the game is shown on; lets screen-size-aware cores (RetroBox Originals) pick their resolution. 0 = unknown. */
+        private val screenHeightPx: Int = 0,
     ) : EmulatorCoreFactory {
 
         override fun create(system: SystemAdapter, core: CoreSpec, rom: File): CoreResult<EmulatorCore> = create(system, core, rom) { false }
@@ -66,7 +68,7 @@ class LibretroCore private constructor(
                 return CoreResult.Err(EmulatorError(ErrorKind.CORE_LOAD_FAILED, "Could not start ${core.displayName}: $it"))
             }
             val ci = api.coreInfo()
-            CoreOptions.forGame(core, rom).forEach { (k, v) -> api.setOption(k, v) }
+            CoreOptions.forGame(core, rom, screenHeightPx).forEach { (k, v) -> api.setOption(k, v) }
             api.loadGame(rom.absolutePath)?.let {
                 api.unloadCore()
                 ErrorLog.e("core", "loadGame(${rom.name}) failed on ${core.id}: $it")

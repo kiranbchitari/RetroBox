@@ -69,14 +69,24 @@ data class AppSettings(
     fun turboFor(systemId: String): Set<com.retrobox.tv.emulator.PadButton> = turbo[systemId].orEmpty()
     fun withTurbo(systemId: String, set: Set<com.retrobox.tv.emulator.PadButton>) = copy(turbo = if (set.isEmpty()) turbo - systemId else turbo + (systemId to set))
 
-    fun graphicsFor(systemId: String): GraphicsSettings = perSystem[systemId]?.applyTo(graphics) ?: graphics
+    /**
+     * The look for [systemId]: its own exception if one is set, else the global default. RetroBox Originals are drawn for the
+     * screen (crisp UI text), so unless the user sets an exception they get plain original-aspect output, smoothed when scaled,
+     * and not the global CRT / scanline look meant for old consoles.
+     */
+    fun graphicsFor(systemId: String): GraphicsSettings =
+        perSystem[systemId]?.applyTo(graphicsDefaultFor(systemId)) ?: graphicsDefaultFor(systemId)
+
+    private fun graphicsDefaultFor(systemId: String) =
+        if (systemId == com.retrobox.tv.emulator.Originals.SYSTEM_ID) GraphicsSettings(ScaleMode.ORIGINAL, bilinear = true, shader = ShaderMode.NONE) else graphics
     fun hasOverride(systemId: String) = perSystem[systemId]?.isEmpty == false
     val safePermille: Int get() = safeAreaPct.coerceIn(0, MAX_SAFE_AREA_PCT) * 10
 
     /** Stores [g] as the choice for [systemId]: only the parts that differ from the global default become an override. */
     fun withSystemGraphics(systemId: String, g: GraphicsSettings): AppSettings {
+        val base = graphicsDefaultFor(systemId)
         val o = GraphicsOverride(
-            scale = g.scale.takeIf { it != graphics.scale }, bilinear = g.bilinear.takeIf { it != graphics.bilinear }, shader = g.shader.takeIf { it != graphics.shader },
+            scale = g.scale.takeIf { it != base.scale }, bilinear = g.bilinear.takeIf { it != base.bilinear }, shader = g.shader.takeIf { it != base.shader },
         )
         return copy(perSystem = if (o.isEmpty) perSystem - systemId else perSystem + (systemId to o))
     }

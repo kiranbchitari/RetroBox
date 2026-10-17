@@ -211,12 +211,13 @@ class GameActivity : ComponentActivity() {
         title = titleFromFileName(fileName)
         File(filesDir, LOCK_FILE).writeText("${system.id}|$romKey|${System.currentTimeMillis()}")
         SessionInfo.set("Selected core" to coreSpec.displayName, "Current ROM" to fileName, "Status" to "loading")
+        val screenHeightPx = resources.displayMetrics.let { minOf(it.widthPixels, it.heightPixels) }
         Thread({
             val rom = try { RomAccess.materialize(this, romKey, fileName) } catch (e: RomUnavailableException) {
                 runOnUiThread { if (!isDestroyed && !finishing) showError(e.message ?: "The ROM is not available.") }
                 return@Thread
             }
-            val factory = LibretroCore.Factory(NativeHost, File(applicationInfo.nativeLibraryDir), File(getExternalFilesDir(null) ?: filesDir, "system"), File(filesDir, "saves/core"))
+            val factory = LibretroCore.Factory(NativeHost, File(applicationInfo.nativeLibraryDir), File(getExternalFilesDir(null) ?: filesDir, "system"), File(filesDir, "saves/core"), screenHeightPx)
             val result = factory.create(system, coreSpec, rom) { isDestroyed || finishing }
             runOnUiThread {
                 if (isDestroyed || finishing) { (result as? CoreResult.Ok)?.value?.close(); return@runOnUiThread }

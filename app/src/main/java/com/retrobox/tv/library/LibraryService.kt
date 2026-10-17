@@ -33,6 +33,7 @@ class LibraryService(private val context: Context, private val store: LibrarySto
             val wanted = appFolders.filter { "/Android/data/" in it.absolutePath }.ifEmpty { appFolders.take(1) }
             store.folders().filter { it.kind == FolderKind.APP && it.location !in wanted.map { w -> w.absolutePath } }.forEach { store.removeFolder(it.id) }
             wanted.forEach { dir -> dir.mkdirs(); store.addFolder(FolderKind.APP, dir.absolutePath, if ("/Android/data/" in dir.absolutePath) "App folder (shared, adb/USB): Android/data/…/${dir.parentFile?.name}/${dir.name}" else "App folder (private)") }
+            wanted.forEach { dir -> runCatching { com.retrobox.tv.emulator.Originals.install(dir) } }   // the games that ship with the app
             publish()
             scanAllNow()
         }

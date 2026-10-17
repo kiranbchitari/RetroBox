@@ -6,6 +6,7 @@ object Systems {
     private val snesButtons = nesButtons + listOf(PadButton.Y, PadButton.X, PadButton.L, PadButton.R)
     private val gbaButtons = nesButtons + listOf(PadButton.L, PadButton.R)
     // Both Genesis cores read the RetroPad like this (cores/GENESIS_HANDOVER.md): B=B, Y=A, A=C, L=X, X=Y, R=Z, Select=Mode.
+    private val originalsButtons = listOf(PadButton.A, PadButton.B, PadButton.START, PadButton.UP, PadButton.DOWN, PadButton.LEFT, PadButton.RIGHT)
     private val genesisNames = mapOf(
         PadButton.Y to "A", PadButton.B to "B", PadButton.A to "C", PadButton.L to "X", PadButton.X to "Y", PadButton.R to "Z", PadButton.SELECT to "Mode",
     )
@@ -27,6 +28,11 @@ object Systems {
             listOf(CoreSpec("genesis_plus_gx", "Genesis Plus GX", "non-commercial (MAME-style)"), CoreSpec("picodrive", "PicoDrive", "non-commercial (MAME-style)")),
             genesisOrder, SystemStatus.VERIFIED, "Verified on an Android TV emulator with a test ROM; not yet on a real TV", players = 2,
             buttonNames = genesisNames, editorOrder = genesisOrder, turboButtons = listOf(PadButton.Y, PadButton.B, PadButton.A)),
+        // Games made for RetroBox itself (cores/originals): a tiny .rbo "cartridge" picks the game inside one core.
+        SystemAdapter(Originals.SYSTEM_ID, "RetroBox Originals", setOf(Originals.EXTENSION), listOf(CoreSpec(Originals.CORE_ID, "RetroBox Originals", "GPL-2.0")),
+            originalsButtons, SystemStatus.EXPERIMENTAL, "Built for RetroBox; not yet checked on a real TV",
+            buttonNames = mapOf(PadButton.A to "Confirm", PadButton.B to "Back", PadButton.START to "Pause"),
+            editorOrder = listOf(PadButton.A, PadButton.B, PadButton.START, PadButton.UP, PadButton.DOWN, PadButton.LEFT, PadButton.RIGHT), turboButtons = emptyList()),
     )
 
     fun byId(id: String): SystemAdapter? = all.firstOrNull { it.id == id }

@@ -26,6 +26,7 @@ object RomValidator {
                 "gb", "gbc" -> gbHeaderOk(rom)
                 "gba" -> gbaHeaderOk(rom)
                 "genesis" -> genesisHeaderOk(rom)
+                Originals.SYSTEM_ID -> Originals.isCartridge(readAt(rom, 0, Originals.MAGIC.size))
                 else -> true
             }
         } catch (_: java.io.IOException) {
@@ -38,6 +39,7 @@ object RomValidator {
             "gb", "gbc" -> "a valid Game Boy ROM (no Nintendo logo / header checksum)"
             "gba" -> "a valid GBA ROM (bad header)"
             "genesis" -> "a Genesis / Mega Drive ROM (no \"SEGA\" header)"
+            Originals.SYSTEM_ID -> "a RetroBox Originals cartridge (no RBO1 header)"
             else -> "a valid ROM"
         }
         return EmulatorError(ErrorKind.ROM_INVALID, "${rom.name} is not $what. The file may be corrupt or a different format.")

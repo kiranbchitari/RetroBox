@@ -13,3 +13,4 @@ app/src/main/jniLibs/
 app/.cxx/
 tools/core-harness/core-harness
 .kotlin/
+cores/originals/out/

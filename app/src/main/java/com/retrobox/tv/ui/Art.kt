@@ -51,6 +51,7 @@ fun ConsoleIcon(systemId: String, modifier: Modifier = Modifier) {
             "gbc" -> drawGameBoy(body = Color(0xFF7B52D8), screen = Color(0xFF38C6B4), bezel = Color(0xFF1B1F2E), buttons = Color(0xFF2C2F3D))
             "gba" -> drawGba()
             "genesis" -> drawGenesis()
+            "originals" -> drawOriginals()
             else -> drawNes()
         }
     }
@@ -58,6 +59,20 @@ fun ConsoleIcon(systemId: String, modifier: Modifier = Modifier) {
 
 /** Aspect ratio (width / height) the icon of [systemId] is drawn for. */
 fun consoleIconAspect(systemId: String) = when (systemId) { "gb", "gbc" -> 0.62f; "nes" -> 1.9f; "snes" -> 1.75f; "gba" -> 1.7f; "genesis" -> 1.75f; else -> 1.5f }
+
+/** RetroBox Originals: a small game screen with the snake and its apple. */
+private fun DrawScope.drawOriginals() {
+    box(0.1f, 0.04f, 0.8f, 0.92f, 0.12f, Color(0xFF2B5566))
+    box(0.14f, 0.1f, 0.72f, 0.8f, 0.09f, Color(0xFF0B2530))
+    val body = Color(0xFF3DDC97)
+    box(0.24f, 0.62f, 0.5f, 0.12f, 0.05f, body)
+    box(0.62f, 0.32f, 0.12f, 0.42f, 0.05f, body)
+    box(0.3f, 0.32f, 0.44f, 0.12f, 0.05f, Color(0xFF2DB87E))
+    box(0.24f, 0.28f, 0.14f, 0.2f, 0.07f, Color(0xFF96FFC4))
+    dot(0.29f, 0.34f, 0.025f, Color(0xFF0B2530))
+    dot(0.29f, 0.43f, 0.025f, Color(0xFF0B2530))
+    dot(0.4f, 0.68f, 0.05f, Color(0xFFFF4D6D))
+}
 
 private fun DrawScope.drawNes() {
     box(0.01f, 0.08f, 0.98f, 0.84f, 0.06f, Color(0xFFC9CCD3))

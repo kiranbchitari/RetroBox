@@ -102,7 +102,15 @@ build_core() {
   esac
 }
 
-WANT="${*:-fceumm snes9x2005 gambatte gpsp mgba}"
+WANT="${*:-fceumm snes9x2005 gambatte gpsp mgba retrobox_originals}"
+
+# RetroBox Originals is our own code (cores/originals), not fetched: built by its own script, licensed like the app (GPL-2.0).
+case " $WANT " in *" retrobox_originals "*)
+  echo "==> retrobox_originals (local source)"
+  "$HERE/originals/build-android.sh"
+  mkdir -p "$OUT/licenses"
+  { echo "retrobox_originals — source: cores/originals in the RetroBox repository (the games made for RetroBox)"; echo; cat "$HERE/../LICENSE"; } > "$OUT/licenses/core-retrobox_originals.txt" ;;
+esac
 echo "$CORES_TABLE" | while IFS='|' read -r name repo sha; do
   [ -z "$name" ] && continue
   case " $WANT " in *" $name "*) fetch "$name" "$repo" "$sha"; build_core "$name"; install_license "$name" "$repo" "$sha";; esac
