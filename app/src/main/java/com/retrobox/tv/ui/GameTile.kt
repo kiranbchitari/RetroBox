@@ -67,9 +67,10 @@ fun GameTile(
     onFocus: () -> Unit = {},
     onClick: () -> Unit,
 ) {
+    val ok = rememberOkLongPress(onOptions, onClick)
     Surface(
-        onClick = onClick, onLongClick = onOptions,
-        modifier = modifier.onKeyEvent { e ->
+        onClick = ok.onClick, onLongClick = ok.onLongClick,
+        modifier = modifier.then(ok.modifier).onKeyEvent { e ->
             if (e.type == KeyEventType.KeyUp && (e.key == Key.ButtonY || e.key == Key.Menu)) { onToggleFavorite(); true } else false
         }.onFocusChanged { if (it.isFocused) onFocus() },
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(12.dp)),

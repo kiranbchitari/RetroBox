@@ -22,7 +22,7 @@ object Systems {
         SystemAdapter(Originals.SYSTEM_ID, "RetroBox Originals", setOf(Originals.EXTENSION), listOf(CoreSpec(Originals.CORE_ID, "RetroBox Originals", "GPL-2.0")),
             originalsButtons, SystemStatus.EXPERIMENTAL, "Built for RetroBox; not yet checked on a real TV",
             buttonNames = mapOf(PadButton.A to "Confirm", PadButton.B to "Back", PadButton.START to "Pause"),
-            editorOrder = listOf(PadButton.A, PadButton.B, PadButton.START, PadButton.UP, PadButton.DOWN, PadButton.LEFT, PadButton.RIGHT), turboButtons = emptyList()),
+            editorOrder = listOf(PadButton.A, PadButton.B, PadButton.START, PadButton.UP, PadButton.DOWN, PadButton.LEFT, PadButton.RIGHT), turboButtons = emptyList(), stickFourWay = true),
     )
 
     fun byId(id: String): SystemAdapter? = all.firstOrNull { it.id == id }

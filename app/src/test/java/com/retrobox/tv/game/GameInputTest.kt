@@ -120,4 +120,42 @@ class GameInputTest {
         assertEquals(bit(PadButton.SELECT), maskFor("gb", KeyEvent.KEYCODE_SHIFT_RIGHT))
         assertEquals(0, maskFor("gb", KeyEvent.KEYCODE_A, KeyEvent.KEYCODE_S, KeyEvent.KEYCODE_Q, KeyEvent.KEYCODE_W))   // no Y/X/L/R on Game Boy
     }
+
+    // --- 4-way stick (RetroBox Originals / Snake) ---
+    private fun snakeInput() = GameInput(DefaultMappings.gamepad, Systems.byId("originals")!!.buttons.toSet(), fourWayStick = Systems.byId("originals")!!.stickFourWay)
+
+    @Test fun originalsUseAFourWayStickAndOtherSystemsKeepEightWay() {
+        assertTrue(Systems.byId("originals")!!.stickFourWay)
+        assertTrue(Systems.all.filter { it.id != "originals" }.none { it.stickFourWay })
+        val nes = nesInput(); nes.onAxes(0f, 0f, 0.9f, 0.9f)
+        assertEquals(bit(PadButton.RIGHT) or bit(PadButton.DOWN), nes.mask)   // diagonals still work for platformers
+    }
+
+    @Test fun aSidewaysPushThatRollsDownDoesNotAlsoPressDown() {
+        val i = snakeInput()
+        i.onAxes(0f, 0f, 0.7f, 0.2f); assertEquals(bit(PadButton.RIGHT), i.mask)
+        i.onAxes(0f, 0f, 0.7f, 1.0f); assertEquals("Y overshoot while pushing right", bit(PadButton.RIGHT), i.mask)
+        i.onAxes(0f, 0f, 0.6f, 0.9f); assertEquals(bit(PadButton.RIGHT), i.mask)
+    }
+
+    @Test fun theAxisIsChosenByWhicheverIsFurtherOutWhenThePushStarts() {
+        val i = snakeInput()
+        i.onAxes(0f, 0f, 0.55f, 0.8f); assertEquals(bit(PadButton.DOWN), i.mask)
+        i.onAxes(0f, 0f, 0f, 0f); assertEquals(0, i.mask)
+        i.onAxes(0f, 0f, -0.9f, -0.6f); assertEquals(bit(PadButton.LEFT), i.mask)
+    }
+
+    @Test fun aLockedDirectionReleasesNearTheCentreAndThenSwitchesAxis() {
+        val i = snakeInput()
+        i.onAxes(0f, 0f, 0.9f, 0f); assertEquals(bit(PadButton.RIGHT), i.mask)
+        i.onAxes(0f, 0f, 0.4f, 0f); assertEquals("hysteresis: still right above 0.3", bit(PadButton.RIGHT), i.mask)
+        i.onAxes(0f, 0f, 0.2f, 0.9f); assertEquals(bit(PadButton.DOWN), i.mask)
+    }
+
+    @Test fun theHatStillGivesTwoDirectionsAndClearResetsTheLock() {
+        val i = snakeInput()
+        i.onAxes(1f, 1f, 0f, 0f); assertEquals(bit(PadButton.RIGHT) or bit(PadButton.DOWN), i.mask)
+        i.onAxes(0f, 0f, 0.9f, 0f); i.clear(); i.onAxes(0f, 0f, 0.1f, 0.8f)
+        assertEquals(bit(PadButton.DOWN), i.mask)
+    }
 }

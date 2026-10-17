@@ -15,7 +15,7 @@ cores/build-cores.sh && ./gradlew assembleDebug     # details in INSTALL.md
 
 ## Current state
 
-Milestones 1–7 are built, plus zip ROMs, fast-forward/turbo and RetroBox Originals (Snake). Genesis was added and then removed again (2026-10-17). **Everything was verified on an Android TV emulator (API 36, arm64) only.** Nothing has run on the Mi TV, no physical controller was used, and no one has heard the sound. The SNES, Game Boy, GBC and GBA cores have played only this repo's original test ROMs, not real games (NES and SNES also ran user-supplied games). Automated checks: 213 JVM unit tests, a native layout test, and 32 on-device tests (`tools/run-device-tests.sh`), all passing on the emulator.
+Milestones 1–7 are built, plus zip ROMs, fast-forward/turbo and RetroBox Originals (Snake). Genesis was added and then removed again (2026-10-17). **Everything was verified on an Android TV emulator (API 36, arm64) only.** Nothing has run on the Mi TV, no physical controller was used, and no one has heard the sound. The SNES, Game Boy, GBC and GBA cores have played only this repo's original test ROMs, not real games (NES and SNES also ran user-supplied games). Automated checks: 218 JVM unit tests, a native layout test, and 34 on-device tests (`tools/run-device-tests.sh`), all passing on the emulator.
 
 ## Not implemented
 

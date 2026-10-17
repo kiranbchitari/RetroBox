@@ -233,7 +233,7 @@ class GameActivity : ComponentActivity() {
         core = c
         profileSet = ProfileStore(File(filesDir, "profiles.json")).load()
         val buttons = c.system.buttons.toSet()
-        val inputs = (0 until c.system.players).map { p -> GameInput(ProfileResolver.resolve(DefaultMappings.gamepad, profileSet, systemId, romName, p), buttons) }
+        val inputs = (0 until c.system.players).map { p -> GameInput(ProfileResolver.resolve(DefaultMappings.gamepad, profileSet, systemId, romName, p), buttons, fourWayStick = c.system.stickFourWay) }
         val assigner = PlayerAssigner(c.system.players)
         assigner.assignInitial(connectedGamepadIds())
         players = PlayerInputs(inputs, assigner)

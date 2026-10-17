@@ -339,9 +339,10 @@ private fun MappingRow(
     modifier: Modifier, onFocus: () -> Unit, onClear: () -> Unit, onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val ok = rememberOkLongPress(onClear, onClick)
     Surface(
-        onClick = onClick, onLongClick = onClear,
-        modifier = modifier.fillMaxWidth().height(40.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() },
+        onClick = ok.onClick, onLongClick = ok.onLongClick,
+        modifier = modifier.then(ok.modifier).fillMaxWidth().height(40.dp).onFocusChanged { focused = it.isFocused; if (it.isFocused) onFocus() },
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp)),
         colors = ClickableSurfaceDefaults.colors(containerColor = Color(0x661B2350), contentColor = RB.Text, focusedContainerColor = Color(0x80301A4A), focusedContentColor = RB.Text),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.0f),

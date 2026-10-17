@@ -42,10 +42,13 @@ class GameInput(
     private val keyMap: Map<Int, PadButton>,
     private val supported: Set<PadButton>,
     private val stickThreshold: Float = 0.5f,
+    /** The stick gives one direction at a time (4-way games such as Snake): see [stickDirections]. */
+    private val fourWayStick: Boolean = false,
 ) {
     private var keyMask = 0
     private var hatMask = 0
     private var stickMask = 0
+    private var lockedAxis = AXIS_NONE   // 4-way sticks: the axis the current push belongs to
 
     val mask: Int get() = filter(keyMask or hatMask or stickMask)
     val selectAndStartDown: Boolean get() = (keyMask and bit(PadButton.SELECT)) != 0 && (keyMask and bit(PadButton.START)) != 0
@@ -78,9 +81,31 @@ class GameInput(
     fun onAxes(hx: Float, hy: Float, sx: Float, sy: Float) {
         hatMask = (if (hx < -0.5f) bit(PadButton.LEFT) else 0) or (if (hx > 0.5f) bit(PadButton.RIGHT) else 0) or
             (if (hy < -0.5f) bit(PadButton.UP) else 0) or (if (hy > 0.5f) bit(PadButton.DOWN) else 0)
-        stickMask = (if (sx < -stickThreshold) bit(PadButton.LEFT) else 0) or (if (sx > stickThreshold) bit(PadButton.RIGHT) else 0) or
-            (if (sy < -stickThreshold) bit(PadButton.UP) else 0) or (if (sy > stickThreshold) bit(PadButton.DOWN) else 0)
+        stickMask = if (fourWayStick) fourWayStick(sx, sy) else
+            (if (sx < -stickThreshold) bit(PadButton.LEFT) else 0) or (if (sx > stickThreshold) bit(PadButton.RIGHT) else 0) or
+                (if (sy < -stickThreshold) bit(PadButton.UP) else 0) or (if (sy > stickThreshold) bit(PadButton.DOWN) else 0)
     }
 
-    fun clear() { keyMask = 0; hatMask = 0; stickMask = 0 }
+    /**
+     * A thumb pushing a stick sideways also rolls it a little up or down, and past the threshold that read as a second direction:
+     * Snake turned right and then, by itself, down. Here a push belongs to the axis that is further out when it starts and keeps it
+     * until the stick comes back near the centre, so the other axis is ignored in between (the D-pad hat is not affected).
+     */
+    private fun fourWayStick(sx: Float, sy: Float): Int {
+        val ax = kotlin.math.abs(sx); val ay = kotlin.math.abs(sy)
+        val stillOut = when (lockedAxis) { AXIS_X -> ax > STICK_RELEASE; AXIS_Y -> ay > STICK_RELEASE; else -> false }
+        if (!stillOut) lockedAxis = if (maxOf(ax, ay) <= stickThreshold) AXIS_NONE else if (ax >= ay) AXIS_X else AXIS_Y
+        return when (lockedAxis) {
+            AXIS_X -> if (sx < 0) bit(PadButton.LEFT) else bit(PadButton.RIGHT)
+            AXIS_Y -> if (sy < 0) bit(PadButton.UP) else bit(PadButton.DOWN)
+            else -> 0
+        }
+    }
+
+    private companion object {
+        const val AXIS_NONE = 0; const val AXIS_X = 1; const val AXIS_Y = 2
+        const val STICK_RELEASE = 0.3f   // a locked direction lets go below this (hysteresis: no flicker around the threshold)
+    }
+
+    fun clear() { keyMask = 0; hatMask = 0; stickMask = 0; lockedAxis = AXIS_NONE }
 }

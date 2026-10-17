@@ -72,7 +72,8 @@ class HomeNavigationDeviceTest {
         assertTrue("Down from the top card should land on a system, got ${rule.focusedTexts()}", rule.focusedTexts().any { it in systems })
         repeat(systems.size) { rule.key(KeyEvent.KEYCODE_DPAD_LEFT) }
         assertTrue("leftmost system should be NES, got ${rule.focusedTexts()}", "NES" in rule.focusedTexts())
-        rule.moveTo(KeyEvent.KEYCODE_DPAD_RIGHT, systems.last())                   // the rightmost system tile
+        rule.key(KeyEvent.KEYCODE_DPAD_DOWN)                                       // systems are a grid, 3 per row: down from NES is the second row
+        rule.moveTo(KeyEvent.KEYCODE_DPAD_RIGHT, systems.last(), max = 3)          // ... and its last card is the last system
         rule.key(KeyEvent.KEYCODE_DPAD_DOWN)                                       // into the Tools row
         rule.moveTo(KeyEvent.KEYCODE_DPAD_RIGHT, "TV safe area")                  // Settings is the rightmost tool
         rule.moveTo(KeyEvent.KEYCODE_DPAD_LEFT, "Detect pads")                    // Controllers, first tool

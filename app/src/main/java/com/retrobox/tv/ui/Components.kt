@@ -108,10 +108,11 @@ fun GameCard(
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
+    val ok = rememberOkLongPress(onLongClick, onClick)
     Surface(
-        onClick = onClick,
-        onLongClick = onLongClick,
-        modifier = modifier.width(width).height(height).onFocusChanged { if (it.isFocused) onFocus() },
+        onClick = ok.onClick,
+        onLongClick = ok.onLongClick,
+        modifier = modifier.then(ok.modifier).width(width).height(height).onFocusChanged { if (it.isFocused) onFocus() },
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(14.dp)),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = RB.Surface, contentColor = RB.Text,

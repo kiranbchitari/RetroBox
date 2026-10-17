@@ -33,6 +33,8 @@ data class SystemAdapter(
     val editorOrder: List<PadButton> = listOf(PadButton.A, PadButton.B, PadButton.X, PadButton.Y, PadButton.L, PadButton.R, PadButton.START, PadButton.SELECT, PadButton.UP, PadButton.DOWN, PadButton.LEFT, PadButton.RIGHT),
     /** Buttons that can be set to auto-fire, in menu order; null = the face buttons A B X Y this system has. */
     val turboButtons: List<PadButton>? = null,
+    /** The left stick acts as a 4-way D-pad (one direction at a time) instead of 8-way: for menus and grid games where a slip must not turn twice. */
+    val stickFourWay: Boolean = false,
 ) {
     fun nameOf(b: PadButton): String = buttonNames[b] ?: b.label
 
