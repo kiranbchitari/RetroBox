@@ -275,3 +275,18 @@ frame time about 5% higher than the code-drawn version (1080p 113 vs 120 frames/
 clang -Wall -Wextra clean. **Not verified:** the Android build (no NDK in this environment; `build-android.sh` now also
 compiles `sprite.c`), the emulator device tests, the Mi TV (speed on its 32-bit CPU, setup time, memory: decoded sprites take about
 3.8 MB at 720p and 5.8 MB at 1080p), and whether the art reads well on a TV from a sofa. The bosses are still drawn in code.
+
+### Blizzard Buddies boss sprites, bigger characters (2026-10-18, host harness only)
+
+The ogre, frost wizard and rage ogre use the supplied boss pack (`assets/src/bosses`), plus its ice balls, hit stars,
+snow cloud and dust as effects; every character is drawn 18% bigger (bosses: 118% of their hit box) with hit boxes,
+physics, controls and shot origins unchanged. Checked in the Linux harness at 720p and 1080p: both gallery pages (every
+frame on its feet line), the title (no overlap with the menu text), level 7 play before/after on the same frame (same
+positions, bigger art), and bot games at levels 5, 10 and 15 (god mode) through each boss's walk, wind-up, swing / cast
+/ roar / punch and death; the shots leave from the swing / punch / staff hand. The rolled-snowball hit pose with stars
+was only seen in a scratch build that triggered it on every snow hit (the bot never rolls a snowball into a boss); the
+pose code is the same. AddressSanitizer + UndefinedBehaviorSanitizer: those builds at 540p / 720p / 1080p plus the
+wizard fight to its death at 720p and 1080p, no reports. Cost here: boss levels 115-117 vs 117-119 frames/s at 1080p,
+sprite setup 31 ms (720p) / 62 ms (1080p), decoded sprites 5.1 MB (720p) / 9.9 MB (1080p), the core library 1.1 MB.
+**Not verified:** the Android build and device tests (no NDK here), the Mi TV (speed, setup time, memory), a person
+playing the boss fights, and a real rolled-snowball hit on a boss.

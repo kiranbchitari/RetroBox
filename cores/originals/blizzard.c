@@ -1,8 +1,8 @@
 /* RetroBox Originals - Blizzard Buddies: a one-screen snowball platformer for one or two players. An original game:
  * throw snow at the monsters, bury them in snowballs, roll the balls into the rest. Logic runs on a 32 x 18 tile board at
  * 60 Hz; drawing is resolution independent (a tile is height / 18 pixels, so 960x540, 1280x720 and 1920x1080 all fill the
- * screen exactly). The buddies and the five small monsters are sprites (sprite.c, art in assets/); the scenery, the
- * snowballs, the ghost and the bosses are drawn in code, and so are the characters if the sprites cannot be set up. */
+ * screen exactly). The buddies, the monsters and the bosses are sprites (sprite.c, art in assets/); the scenery, the
+ * snowballs, the ghost and the fireballs are drawn in code, and so are the characters if the sprites cannot be set up. */
 #include "game.h"
 #include "gfx.h"
 #include "snd.h"
@@ -42,7 +42,7 @@ typedef struct {
     int32_t kind, cd;
     float x, y, vx, vy, by, kb;
 } Enemy;
-typedef struct { int32_t used, life, owner, power; float x, y, vx, vy; } Shot;    /* owner 0/1 = player, 2 = monster fire */
+typedef struct { int32_t used, life, owner, power; float x, y, vx, vy; } Shot;    /* owner 0/1 = player, 2 = monster fire (power 2: the wizard's ice) */
 typedef struct { int32_t used, type, life; float x, y, vy; } Item;
 
 typedef struct {
@@ -281,6 +281,11 @@ static float dmul(void) { return DIFF_SPEED[st.difficulty]; }
 static void do_shake(int n) { if (n > st.shake) st.shake = n; }
 static void do_stop(int n) { if (n > st.hitstop) st.hitstop = n; }
 
+/* hitFlash only drives drawing: 7 after a snow hit (a white flash), BOSS_HIT_POSE after a boss takes a rolled snowball
+ * (the hit pose with dizzy stars while it counts down past 7, a flash at its start). */
+#define BOSS_HIT_POSE 40
+static int flash_on(const Enemy *e) { return (e->hitFlash > 4 && e->hitFlash <= 7) || e->hitFlash > BOSS_HIT_POSE - 3; }
+
 static void kill_player(int i) {
     Player *p = &st.pl[i];
     p->dead = 1; p->lives--; p->vx = 0.f; p->vy = -.45f; p->speedUp = p->rangeUp = p->powerUp = 0;
@@ -332,7 +337,7 @@ static void shatter_ball(Enemy *e) {
 
 static void hit_enemy_with_snow(Enemy *e, const Shot *s) {
     if (e->state == ES_NORMAL) {
-        e->hitFlash = 7;
+        if (e->hitFlash < 7) e->hitFlash = 7;              /* drawing only; does not cut a boss's longer hit pose short */
         burst(s->x, s->y, RGB(255, 255, 255), 7, .1f, .09f);
         give_score(s->owner, 10, 0, 0);
         snd_play(SND_HIT);
@@ -383,7 +388,7 @@ static void update_player(int i, const Pad *pad, const Pad *pv) {
     }
     if (p->invuln > 0) p->invuln--;
 #ifdef RB_GODMODE
-    p->invuln = 100;
+    p->invuln = 96;                                         /* test builds: never hit, and drawn (96 / 4 is even: the blink shows it) */
 #endif
     int left = pad->left, right = pad->right, down = pad->down;
     int jumpPress = (pad->b && !pv->b) || (pad->up && !pv->up);
@@ -453,7 +458,7 @@ static void boss_fire(Enemy *e, float px, int n, float spread) {
     e->dir = dir > 0.f ? 1 : -1;
     for (int k = 0; k < n; k++) {
         float vy = n == 1 ? 0.f : (float)(k - (n - 1) / 2) * spread;
-        add_shot(e->x + dir * 1.3f, e->y - 1.2f, dir * .12f * dmul(), vy, 130, 2, 1);
+        add_shot(e->x + dir * 1.3f, e->y - 1.2f, dir * .12f * dmul(), vy, 130, 2, e->kind == 1 ? 2 : 1);   /* power 2: drawn as ice */
     }
     snd_play(SND_BOSS);
 }
@@ -495,7 +500,7 @@ static void update_enemy(Enemy *e) {
             Enemy *o = &st.en[k];
             if (o == e || !o->used || o->state == ES_DYING || o->state == ES_ROLL || o->type == E_GHOST) continue;
             if (fabs_(o->x - e->x) < .5f + EHW[o->type] && o->y > e->y - .95f - .1f && o->y - EH[o->type] < e->y) {
-                if (o->type == E_BOSS) { o->hp -= 4; o->hitFlash = 10; do_shake(8); burst(o->x, o->y - 1.f, RGB(255, 255, 255), 12, .13f, .12f); if (o->hp <= 0) kill_enemy(o, e->owner, 1); shatter_ball(e); return; }
+                if (o->type == E_BOSS) { o->hp -= 4; o->hitFlash = BOSS_HIT_POSE; do_shake(8); burst(o->x, o->y - 1.f, RGB(255, 255, 255), 12, .13f, .12f); if (o->hp <= 0) kill_enemy(o, e->owner, 1); shatter_ball(e); return; }
                 if (o->state == ES_FROZEN) { start_roll(o, e->dir, e->owner); continue; }
                 e->combo++;
                 kill_enemy(o, e->owner, e->combo);
@@ -1028,14 +1033,89 @@ static void draw_ball(const Enemy *e, float px, float py, float uu) {
     }
 }
 
+/* Stars circling a dazed head (the art pack's hit star): centre (cx, cy), radius r, star size in tile pixels. */
+static void dizzy_stars(float cx, float cy, float r, int t, float size) {
+    for (int k = 0; k < 3; k++) {
+        float a = (float)t * .2f + (float)k * 2.09f, depth = sinf(a);      /* smaller and dimmer behind the head */
+        SprDraw d = {size * (.8f + .2f * depth), 1.f, 1.f, 0.f, 0, 0, 200 + (int)(55.f * depth), 0};
+        spr_draw(&fb, spr_frame(SPR_FX_STAR, 0, 0), cx + cosf(a) * r, cy + depth * r * .25f, &d);
+    }
+}
+
+/* A boss shot starts with 130 frames to live and a spitter's with 100, so a monster shot above 115 left the boss in the
+ * last 15 frames: show the swing / cast. Read from the game state, so a loaded save state draws the same picture. */
+static int boss_fired_recently(void) {
+    for (int i = 0; i < MAXS; i++) if (st.sh[i].used && st.sh[i].owner == 2 && st.sh[i].life > 115) return 1;
+    return 0;
+}
+
+/* The bosses as sprites. The art has one drawing per pose, so the motion between poses is the game's: the ogres'
+ * waddle, lean and footstep dust (the pack's dust), the wizard's hover, the death cloud (the pack's explosion). The
+ * shots still leave from the same point (boss_fire); the swing and cast poses are timed around them. */
+static void draw_boss_sprite(const Enemy *e, float px, float py, float uu) {
+    int dying = e->state == ES_DYING, t = e->anim, wizard = e->kind == 1;
+    int dazed = !dying && e->hitFlash > 7;
+    int fired = !dying && !dazed && boss_fired_recently(), windup = !dying && !dazed && !fired && e->timer < 18;
+    SprDraw d = {uu, 1.f, 1.f, 0.f, e->dir < 0, 0, 255, !dying && flash_on(e) ? 100 : 0};   /* softer on a big sprite */
+    if (dying && e->timer > 40) d.alpha = (50 - e->timer) * 25;
+    float ax = px, ay = py;
+    int fr, idle;
+    if (wizard) {
+        idle = spr_frame(SPR_WIZARD_IDLE, 0, 0);
+        if (!dying) {
+            ay -= sinf((float)t * .08f) * .06f * uu;
+            gfx_circle(&fb, px, ay - 1.4f * uu, 1.8f * uu, RGB(120, 190, 255), 26);    /* frost aura: no such art */
+        }
+        if (dying) fr = spr_frame(SPR_WIZARD_DEATH, 0, 0);
+        else if (dazed) fr = spr_frame(SPR_WIZARD_HIT, 0, 0);
+        else if (fired || windup) fr = spr_frame(SPR_WIZARD_CAST, 0, 0);
+        else fr = spr_frame(SPR_WIZARD_IDLE, t / 12, 1);
+    } else {
+        int rage = e->kind == 2;
+        idle = rage ? spr_frame(SPR_RAGE_IDLE, 0, 0) : spr_frame(SPR_OGRE_IDLE, 0, 0);
+        if (dying) fr = rage ? spr_frame(SPR_RAGE_DEATH, 0, 0) : spr_frame(SPR_OGRE_DEATH, 0, 0);
+        else if (dazed) fr = rage ? spr_frame(SPR_RAGE_HIT, 0, 0) : spr_frame(SPR_OGRE_HIT, 0, 0);
+        else if (fired) fr = rage ? spr_frame(SPR_RAGE_ATTACK, 0, 0) : spr_frame(SPR_OGRE_ATTACK, 1, 0);
+        else if (windup && e->ground) fr = rage ? spr_frame(SPR_RAGE_ROAR, 0, 0) : spr_frame(SPR_OGRE_ATTACK, 0, 0);
+        else {
+            fr = idle;
+            if (e->ground) {                                     /* a heavy waddle: bob and footstep dust */
+                float ph = (float)t * (rage ? .2f : .15f);
+                ay -= fabs_(sinf(ph)) * .08f * uu;
+                float since = fmodf(ph, 3.14159265f) / (rage ? .2f : .15f);          /* frames since a foot landed */
+                if (since < 9.f) {
+                    SprDraw dd = {uu * 1.3f, 1.f, 1.f, 0.f, e->dir > 0, 0, 220 - (int)(since * 20.f), 0};
+                    spr_draw(&fb, spr_frame(SPR_FX_DUST, (int)since / 3, 0), px - (float)e->dir * .9f * uu, py - .25f * uu, &dd);
+                }
+            } else if (e->vy < 0.f) { d.sy = 1.05f; d.sx = .97f; }
+        }
+    }
+    spr_draw(&fb, fr, ax, ay, &d);
+    if (dying) {
+        if (e->timer < 27) {                                     /* the pack's explosion cloud */
+            SprDraw cd = {uu * 2.4f, 1.f, 1.f, 0.f, 0, 0, 255 - e->timer * 6, 0};
+            spr_draw(&fb, spr_frame(SPR_FX_CLOUD, e->timer / 9, 0), px, py - 1.1f * uu, &cd);
+        }
+        return;
+    }
+    float top = ay - spr_top(idle) * uu;
+    if (dazed) dizzy_stars(px, top + .2f * uu, .8f * uu, t, uu);
+    float frac = (float)e->hp / (float)boss_max(e->kind, st.level);       /* health bar above the head */
+    if (frac < 0.f) frac = 0.f;
+    float by = top - .4f * uu;
+    gfx_rrect(&fb, px - 1.2f * uu, by, 2.4f * uu, .16f * uu, .08f * uu, RGB(20, 24, 40), 220);
+    gfx_rrect(&fb, px - 1.2f * uu + .02f * uu, by + .02f * uu, (2.4f * uu - .04f * uu) * frac, .12f * uu, .06f * uu, wizard ? RGB(120, 200, 255) : RGB(255, 90, 90), 255);
+}
+
 /* The five small monsters as sprites. Poses the art does not have are built from the ones it has: the yeti's walk and
  * charge are its idle frames with a bob or a forward lean (its run frames stand in a painted snow cloud). Returns 0 for
- * the ghost and the bosses (drawn in code) or without sprites. */
+ * the ghost (drawn in code) or without sprites. */
 static int draw_enemy_sprite(const Enemy *e, float px, float py, float uu) {
-    if (!spr_ready() || e->type == E_GHOST || e->type == E_BOSS) return 0;
+    if (!spr_ready() || e->type == E_GHOST) return 0;
+    if (e->type == E_BOSS) { draw_boss_sprite(e, px, py, uu); return 1; }
     int dying = e->state == ES_DYING, t = e->anim;
     int hit = e->hitFlash > 0 && !dying, hitI = (7 - e->hitFlash) * 3 / 7;
-    SprDraw d = {uu, 1.f, 1.f, 0.f, e->dir < 0, 0, 255, e->hitFlash > 4 && !dying ? 170 : 0};
+    SprDraw d = {uu, 1.f, 1.f, 0.f, e->dir < 0, 0, 255, flash_on(e) && !dying ? 170 : 0};
     if (dying && e->timer > 40) d.alpha = (50 - e->timer) * 25;
     float ax = px, ay = py;
     int fr;
@@ -1077,7 +1157,10 @@ static int draw_enemy_sprite(const Enemy *e, float px, float py, float uu) {
             d.lean = .22f;
             ax += sinf((float)t * 1.6f) * .03f * uu;
             ay -= fabs_(sinf((float)t * .5f)) * .06f * uu;
-            for (int k = 1; k <= 3; k++) gfx_circle(&fb, px - (float)e->dir * (.5f + (float)k * .25f) * uu, py - .12f * uu, (.1f + (float)k * .03f) * uu, RGB(235, 244, 255), 150 - k * 35);
+            for (int k = 1; k <= 3; k++) {                                     /* snow puffs kicked up behind */
+                SprDraw pd = {uu * (.42f + .1f * (float)k), 1.f, 1.f, 0.f, e->dir > 0, 0, 230 - k * 50, 0};
+                spr_draw(&fb, spr_frame(SPR_FX_CLOUD, 0, 0), px - (float)e->dir * (.45f + (float)k * .32f) * uu, py - .2f * uu, &pd);
+            }
         } else {
             fr = spr_frame(SPR_CHARGER_IDLE, t / 8, 1);
             if (e->ground) ay -= fabs_(sinf((float)t * .2f)) * .05f * uu;     /* a heavy waddle */
@@ -1090,8 +1173,7 @@ static int draw_enemy_sprite(const Enemy *e, float px, float py, float uu) {
     float top = ay - spr_top(fr) * uu;
     if (e->type == E_SHOOT && e->cd < 22 && e->cd > 0 && e->snow == 0)                      /* about to spit */
         gfx_circle(&fb, px + (float)e->dir * .5f * uu, py - .45f * uu, .13f * uu * (1.f + (float)(22 - e->cd) * .03f), RGB(255, 140, 40), 220);
-    if (e->type == E_CHARGE && e->timer > 0)
-        for (int k = 0; k < 3; k++) { float a = (float)e->anim * .2f + (float)k * 2.09f; gfx_circle(&fb, px + cosf(a) * .4f * uu, top - .1f * uu + sinf(a) * .1f * uu, .07f * uu, C_GOLD, 255); }
+    if (e->type == E_CHARGE && e->timer > 0) dizzy_stars(px, top - .1f * uu, .4f * uu, e->anim, uu * .7f);
     if (e->snow > 0) snow_cap(px, top + .1f * uu, uu, e->snow);
     return 1;
 }
@@ -1225,7 +1307,7 @@ static void draw_enemy(const Enemy *e) {
             gfx_circle(&fb, px, py - 2.65f * uu - bobv, .12f * uu, C_GOLD, 255);
             gfx_rrect(&fb, px + (float)e->dir * 1.0f * uu - .04f * uu, py - 2.0f * uu - bobv, .08f * uu, 1.8f * uu, .03f * uu, RGB(160, 110, 70), 255);   /* staff */
             gfx_circle(&fb, px + (float)e->dir * 1.0f * uu, py - 2.05f * uu - bobv, .2f * uu + sinf((float)e->anim * .2f) * .02f * uu, RGB(150, 230, 255), 255);
-            if (e->hitFlash > 0) gfx_circle(&fb, px, py - 1.4f * uu, 1.0f * uu, flash, 120);
+            if (flash_on(e)) gfx_circle(&fb, px, py - 1.4f * uu, 1.0f * uu, flash, 120);
             float frac = (float)e->hp / (float)boss_max(e->kind, st.level);
             if (frac < 0.f) frac = 0.f;
             gfx_rrect(&fb, px - 1.2f * uu, py - 3.4f * uu, 2.4f * uu, .16f * uu, .08f * uu, RGB(20, 24, 40), 220);
@@ -1252,7 +1334,7 @@ static void draw_enemy(const Enemy *e) {
         }
         gfx_rrect(&fb, px - .4f * uu, py - 1.02f * uu - bobv, .8f * uu, .26f * uu, .1f * uu, RGB(60, 20, 50), 255);
         for (int t2 = -1; t2 <= 1; t2++) gfx_rrect(&fb, px + (float)t2 * .22f * uu - .06f * uu, py - 1.02f * uu - bobv, .12f * uu, .12f * uu, .03f * uu, RGB(255, 255, 255), 255);
-        if (e->hitFlash > 0) gfx_rrect(&fb, px - bw * .5f, py - .22f * uu - bh - bobv, bw, bh, .8f * uu, flash, 120);
+        if (flash_on(e)) gfx_rrect(&fb, px - bw * .5f, py - .22f * uu - bh - bobv, bw, bh, .8f * uu, flash, 120);
         float frac = (float)e->hp / (float)boss_max(e->kind, st.level);
         if (frac < 0.f) frac = 0.f;
         gfx_rrect(&fb, px - 1.2f * uu, py - 2.95f * uu, 2.4f * uu, .16f * uu, .08f * uu, RGB(20, 24, 40), 220);
@@ -1267,7 +1349,11 @@ static void draw_shot(const Shot *s) {
         gfx_circle(&fb, x - s->vx * uu * 1.4f, y - s->vy * uu, .1f * uu, RGB(220, 240, 255), 110);
         gfx_circle(&fb, x, y, .19f * uu, RGB(246, 252, 255), 255);
         gfx_circle(&fb, x - .04f * uu, y - .04f * uu, .1f * uu, RGB(255, 255, 255), 255);
-    } else {
+    } else if (s->power == 2 && spr_ready()) {                     /* the frost wizard's ice ball grows out of his hand */
+        int age = 130 - s->life;
+        SprDraw d = {uu, 1.f, 1.f, 0.f, s->vx < 0.f, 0, 255, 0};
+        spr_draw(&fb, spr_frame(SPR_FX_ICEBALL, age / 3, 0), x, y, &d);
+    } else {                                                       /* fireballs: the art pack has none, drawn in code */
         gfx_circle(&fb, x - s->vx * uu * 2.f, y, .16f * uu, RGB(255, 140, 40), 130);
         gfx_circle(&fb, x, y, .26f * uu, RGB(255, 120, 40), 255);
         gfx_circle(&fb, x, y, .14f * uu, RGB(255, 226, 120), 255);
@@ -1309,7 +1395,7 @@ static void draw_hud(void) {
         const Player *p = &st.pl[i];
         float x = i == 0 ? u(14) : (float)W - u(14) - pw;
         panel(x, py, pw, ph, u(12));
-        draw_buddy(st.skin[i], x + u(32), py + u(52), u(38), i == 0 ? 1 : -1, st.frame, 0, 0, 0, 0, 0, 0);
+        draw_buddy(st.skin[i], x + u(32), py + u(52), u(32), i == 0 ? 1 : -1, st.frame, 0, 0, 0, 0, 0, 0);   /* fits the panel */
         if (!p->active) {
             if ((st.frame / 30) & 1) gfx_text(&fb, x + u(66), py + u(24), fs(2), "P2 PRESS START", C_DIM, 255);
             else gfx_text(&fb, x + u(66), py + u(24), fs(2), "CO-OP JOIN", C_DIM, 160);
@@ -1468,41 +1554,55 @@ static void blit_bg(int dx, int dy) {
 }
 
 #ifdef RB_SPRITE_GALLERY
-/* Test builds: every sprite frame of every character at play size, one row per character (the buddy in all skins),
- * plus each animation playing, for checking the art at each resolution with tools/core-harness. */
+/* Test builds: every sprite frame at play size, one row per character, plus each animation playing, for checking the
+ * art at each resolution with tools/core-harness. Two pages, two seconds each: the small characters (and the buddy
+ * skins), then the bosses and the effects. */
 static void draw_gallery(void) {
-    static const char *const NAMES[SPR_NCHARS] = {"BUDDY", "WALKER", "HOPPER", "FLYER", "SPITTER", "CHARGER"};
-    float uu = (float)cell, y = 1.6f * uu;
-    gfx_text(&fb, u(8), u(6), fs(2), "SPRITE GALLERY", C_GOLD, 255);
-    for (int c = 0; c < SPR_NCHARS; c++) {
+    static const char *const NAMES[SPR_NCHARS] = {"BUDDY", "WALKER", "HOPPER", "FLYER", "SPITTER", "CHARGER", "OGRE", "WIZARD", "RAGE", "FX"};
+    float uu = (float)cell, y = 1.2f * uu;
+    int page = (st.frame / 120) & 1, c0 = page ? SPR_OGRE : 0, c1 = page ? SPR_NCHARS : SPR_OGRE;
+    gfx_text(&fb, u(8), u(6), fs(2), page ? "SPRITE GALLERY 2/2" : "SPRITE GALLERY 1/2", C_GOLD, 255);
+    for (int c = c0; c < c1; c++) {
         const SprCharDef *cd = &SPR_CHARS[c];
-        float x = 3.2f * uu, ay = c == SPR_FLYER ? y - .45f * uu : y;
-        gfx_text(&fb, u(8), y - uu * .6f, fs(1.6f), NAMES[c], C_TEXT, 255);
+        float rowH = 0.f;
+        for (int f = 0; f < cd->count; f++) rowH = fmaxf(rowH, (float)SPR_FRAMES[cd->first + f].h / cd->ppt);
+        int centred = c == SPR_FLYER || c == SPR_FX;
+        y += rowH * uu;
+        float x = 3.2f * uu;
+        gfx_text(&fb, u(8), y - uu * .8f, fs(1.6f), NAMES[c], C_TEXT, 255);
         for (int f = 0; f < cd->count; f++) {
             int fr = cd->first + f;
             SprDraw d = {uu, 1.f, 1.f, 0.f, 0, 0, 255, 0};
-            spr_draw(&fb, fr, x + SPR_FRAMES[fr].ax / (float)SPR_PPT * uu, ay, &d);
-            x += (float)SPR_FRAMES[fr].w / (float)SPR_PPT * uu + .12f * uu;
+            float ay = centred ? y - rowH * .5f * uu : y;
+            spr_draw(&fb, fr, x + SPR_FRAMES[fr].ax / cd->ppt * uu, ay, &d);
+            x += (float)SPR_FRAMES[fr].w / cd->ppt * uu + .15f * uu;
         }
-        y += 1.45f * uu;
+        gfx_rrect(&fb, 3.2f * uu, y, x - 3.2f * uu, 1.f, 0, RGB(255, 90, 90), 120);          /* the feet line */
+        y += .35f * uu;
     }
     float x = 3.2f * uu;
-    gfx_text(&fb, u(8), y - uu * .6f, fs(1.6f), "SKINS", C_TEXT, 255);
-    for (int k = 0; k < SPR_CHARS[SPR_BUDDY].npal; k++) {          /* the buddy skins, facing both ways */
-        SprDraw d = {uu, 1.f, 1.f, 0.f, k & 1, k, 255, 0};
-        spr_draw(&fb, spr_frame(SPR_BUDDY_IDLE, st.frame / 10, 1), x + .5f * uu, y, &d);
-        x += 1.4f * uu;
+    if (!page) {
+        y += 1.2f * uu;
+        gfx_text(&fb, u(8), y - uu * .8f, fs(1.6f), "SKINS", C_TEXT, 255);
+        for (int k = 0; k < SPR_CHARS[SPR_BUDDY].npal; k++) {                  /* the buddy skins, facing both ways */
+            SprDraw d = {uu, 1.f, 1.f, 0.f, k & 1, k, 255, 0};
+            spr_draw(&fb, spr_frame(SPR_BUDDY_IDLE, st.frame / 10, 1), x + .6f * uu, y, &d);
+            x += 1.5f * uu;
+        }
+        y += .4f * uu;
     }
-    y += 1.45f * uu;
-    /* every animation playing, the way the game times them */
-    x = 3.2f * uu;
-    for (int a = 0; a < SPR_NANIMS; a++) {
-        int fps = SPR_ANIMS[a].fps ? SPR_ANIMS[a].fps : 8;
+    /* the animations playing, the way the game times them */
+    int a0 = page ? SPR_OGRE_IDLE : 0, a1 = page ? SPR_NANIMS : SPR_OGRE_IDLE;
+    float step = page ? 4.8f : 1.5f, rowH = page ? 3.4f : 1.5f;
+    x = 3.2f * uu; y += rowH * uu;
+    for (int a = a0; a < a1; a++) {
+        int fps = SPR_ANIMS[a].fps ? SPR_ANIMS[a].fps : 3;
         int fr = spr_frame(a, st.frame * fps / 60, 1);
+        int centred = (a >= SPR_FLYER_IDLE && a <= SPR_FLYER_DEATH) || a >= SPR_FX_ICEBALL;
         SprDraw d = {uu, 1.f, 1.f, 0.f, 0, 0, 255, 0};
-        spr_draw(&fb, fr, x, y + (a >= SPR_FLYER_IDLE && a <= SPR_FLYER_DEATH ? -.45f * uu : 0.f), &d);
-        x += 1.3f * uu;
-        if (x > (float)W - uu) { x = 3.2f * uu; y += 1.45f * uu; }
+        spr_draw(&fb, fr, x + step * .5f * uu, centred ? y - .6f * uu : y, &d);
+        x += step * uu;
+        if (x > (float)W - step * uu) { x = 3.2f * uu; y += rowH * uu; }
     }
 }
 #endif

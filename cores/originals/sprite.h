@@ -1,6 +1,6 @@
 /* Character sprites for RetroBox Originals (Blizzard Buddies). The pictures are compiled in (sprites_data.h, made by
  * tools/originals-sprites/build_sprites.py from cores/originals/assets). spr_setup decodes them once per screen size and
- * pre-scales every frame to the game's tile size with an area filter, so drawing at play size is a plain alpha blit. */
+ * pre-scales every frame to the game tile size (area filter down, bilinear up), so drawing at play size is a plain alpha blit. */
 #ifndef RB_SPRITE_H
 #define RB_SPRITE_H
 #include "gfx.h"
@@ -31,5 +31,7 @@ void spr_draw(Surf *s, int frame, float x, float y, const SprDraw *d);
 
 /* Height of a frame above its anchor, in tiles (for things drawn on top, like snow caps). */
 float spr_top(int frame);
+/* Stored pixels per game tile of a frame's character (to lay frames out by their size). */
+float spr_ppt(int frame);
 
 #endif

@@ -4,17 +4,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct { uint32_t *px; int w, h; float ax, ay; } Img;     /* premultiplied 0xAARRGGBB */
+typedef struct { uint32_t *px; int w, h; float ax, ay, ppt; } Img;     /* premultiplied 0xAARRGGBB; ppt = pixels per tile */
 
-static Img *src;          /* as stored (SPR_PPT pixels per tile), one per frame and palette; kept for the buddy only */
-static Img *play;         /* scaled to the game tile */
+static Img *src;          /* as stored (SPR_CHARS[].ppt pixels per tile), one per frame and palette; kept for the title only */
+static Img *play;         /* scaled to the game tile: area-averaged down, or bilinear up for art stored smaller */
 static int nimg, base[SPR_NCHARS], ready;
-static float playTile;
 
 static int char_of(int frame) {
     for (int c = 0; c < SPR_NCHARS; c++)
         if (frame >= SPR_CHARS[c].first && frame < SPR_CHARS[c].first + SPR_CHARS[c].count) return c;
     return -1;
+}
+
+/* The title draws the buddies big, idling and throwing: those frames keep their stored size too. */
+static int title_frame(int frame) {
+    const SprAnimDef *a = &SPR_ANIMS[SPR_BUDDY_IDLE], *b = &SPR_ANIMS[SPR_BUDDY_ATTACK];
+    return (frame >= a->first && frame < a->first + a->count) || (frame >= b->first && frame < b->first + b->count);
 }
 
 static int img_index(int frame, int skin) {
@@ -25,9 +30,9 @@ static int img_index(int frame, int skin) {
     return base[c] + k * d->count + (frame - d->first);
 }
 
-static int decode(Img *im, int frame, int pal) {
+static int decode(Img *im, int frame, int pal, float ppt) {
     const SprFrameDef *f = &SPR_FRAMES[frame];
-    im->w = f->w; im->h = f->h; im->ax = f->ax; im->ay = f->ay;
+    im->w = f->w; im->h = f->h; im->ax = f->ax; im->ay = f->ay; im->ppt = ppt;
     im->px = (uint32_t *)calloc((size_t)f->w * f->h, sizeof(uint32_t));
     if (!im->px) return 0;
     const uint8_t (*p)[4] = SPR_PALS[pal];
@@ -55,7 +60,7 @@ static int shrink(Img *dst, const Img *s, float k) {
     float *tmp = (float *)calloc((size_t)dw * s->h * 4, sizeof(float));
     dst->px = (uint32_t *)calloc((size_t)dw * dh, sizeof(uint32_t));
     if (!tmp || !dst->px) { free(tmp); free(dst->px); dst->px = NULL; return 0; }
-    dst->w = dw; dst->h = dh; dst->ax = s->ax * k; dst->ay = s->ay * k;
+    dst->w = dw; dst->h = dh; dst->ax = s->ax * k; dst->ay = s->ay * k; dst->ppt = s->ppt * k;
     float inv = 1.f / k;
     for (int x = 0; x < dw; x++) {                   /* horizontal pass into tmp (dw x s->h) */
         float a0 = (float)x * inv, a1 = a0 + inv;
@@ -94,11 +99,18 @@ static int shrink(Img *dst, const Img *s, float k) {
     return 1;
 }
 
-static int copy_img(Img *dst, const Img *s) {
-    *dst = *s;
-    dst->px = (uint32_t *)malloc((size_t)s->w * s->h * sizeof(uint32_t));
+static uint32_t sample(const Img *im, float u, float v);
+
+/* Bilinear upscale by k >= 1, done once here so that drawing art stored smaller than the tile (the bosses) is a plain
+ * 1:1 blit like the rest. */
+static int grow(Img *dst, const Img *s, float k) {
+    int dw = (int)ceilf((float)s->w * k), dh = (int)ceilf((float)s->h * k);
+    dst->px = (uint32_t *)malloc((size_t)dw * dh * sizeof(uint32_t));
     if (!dst->px) return 0;
-    memcpy(dst->px, s->px, (size_t)s->w * s->h * sizeof(uint32_t));
+    dst->w = dw; dst->h = dh; dst->ax = s->ax * k; dst->ay = s->ay * k; dst->ppt = s->ppt * k;
+    for (int y = 0; y < dh; y++)
+        for (int x = 0; x < dw; x++)
+            dst->px[(size_t)y * dw + x] = sample(s, ((float)x + .5f) / k - .5f, ((float)y + .5f) / k - .5f);
     return 1;
 }
 
@@ -119,19 +131,17 @@ int spr_setup(int tile) {
     play = (Img *)calloc((size_t)n, sizeof(Img));
     if (!src || !play) { spr_release(); return 0; }
     nimg = n;
-    playTile = (float)tile;
-    float k = (float)tile / (float)SPR_PPT;
     for (int c = 0; c < SPR_NCHARS; c++) {
         const SprCharDef *d = &SPR_CHARS[c];
+        float k = (float)tile / d->ppt;
         for (int p = 0; p < d->npal; p++)
             for (int f = 0; f < d->count; f++) {
                 int i = base[c] + p * d->count + f;
-                if (!decode(&src[i], d->first + f, d->pal + p)) { spr_release(); return 0; }
-                if (!(k < 1.f ? shrink(&play[i], &src[i], k) : copy_img(&play[i], &src[i]))) { spr_release(); return 0; }
-                if (c != SPR_BUDDY) { free(src[i].px); src[i].px = NULL; }     /* only the title draws big, and only buddies */
+                if (!decode(&src[i], d->first + f, d->pal + p, d->ppt)) { spr_release(); return 0; }
+                if (!(k < 1.f ? shrink(&play[i], &src[i], k) : grow(&play[i], &src[i], k))) { spr_release(); return 0; }
+                if (!title_frame(d->first + f)) { free(src[i].px); src[i].px = NULL; }      /* only the title draws big */
             }
     }
-    if (k >= 1.f) playTile = (float)SPR_PPT;
     ready = 1;
     return 1;
 }
@@ -147,7 +157,9 @@ int spr_frame(int anim, int i, int loop) {
     return a->first + i;
 }
 
-float spr_top(int frame) { return SPR_FRAMES[frame].ay / (float)SPR_PPT; }
+float spr_ppt(int frame) { int c = char_of(frame); return c >= 0 ? SPR_CHARS[c].ppt : 64.f; }
+
+float spr_top(int frame) { return SPR_FRAMES[frame].ay / spr_ppt(frame); }
 
 static uint32_t sample(const Img *im, float u, float v) {    /* bilinear, premultiplied; (u, v) in pixel centres */
     int x0 = (int)floorf(u), y0 = (int)floorf(v);
@@ -188,9 +200,8 @@ void spr_draw(Surf *s, int frame, float x, float y, const SprDraw *d) {
     int idx = img_index(frame, d->skin);
     if (idx < 0) return;
     float big = d->tile * fmaxf(d->sx, d->sy);
-    const Img *im = big > playTile * 1.1f && src[idx].px ? &src[idx] : &play[idx];     /* far bigger: the stored frame */
-    float base_tile = im == &src[idx] ? (float)SPR_PPT : playTile;
-    float kx = d->tile / base_tile * d->sx, ky = d->tile / base_tile * d->sy;
+    const Img *im = big > play[idx].ppt * 1.1f && src[idx].px ? &src[idx] : &play[idx];     /* far bigger: the stored frame */
+    float kx = d->tile / im->ppt * d->sx, ky = d->tile / im->ppt * d->sy;
     if (kx <= 0.f || ky <= 0.f) return;
     float ax = d->flip ? (float)im->w - im->ax : im->ax;
     if (fabsf(kx - 1.f) < .01f && fabsf(ky - 1.f) < .01f && d->lean == 0.f) {      /* 1:1, pixel aligned: crisp */
