@@ -1,1 +1,4 @@
 cores/originals/sprites_data.h linguist-generated=true -diff
+cores/originals/levels_data.h linguist-generated=true -diff
+cores/originals/backgrounds_data.h linguist-generated=true -diff
+cores/originals/third_party/** linguist-vendored=true

@@ -22,11 +22,13 @@ ratios. Logic runs on a fixed grid at 60 Hz independent of the resolution.
 |---|---|
 | `core.c` | libretro glue: options, input (D-pad, left stick, A/B/Start), audio batch, save RAM (best scores, last menu choice), save states |
 | `blizzard.c` | Blizzard Buddies, a one-screen snowball platformer for one or two players (see below) |
-| `levels.c` | Adventure mode's tiles and parallax backgrounds: the level pack's 32 px tiles scaled once to the game tile (area filter, square pixels), the theme picture scaled to the screen height and scrolled as row copies |
-| `levels_data.h` | generated, do not edit: the ten Adventure stages (tile rows, things, start / checkpoint / exit / boss arena), tile art and backgrounds (about 220 KB of source) |
+| `levels.c` | Adventure mode's tiles and painted backgrounds: the rich pack's 64 px tiles scaled once to the game tile (area filter), each stage's background decoded from JPEG (stb_image) when the stage starts, scaled 8% taller than the screen with a dithered bilinear filter and slid across that margin as the camera moves |
+| `levels_data.h` | generated, do not edit: the ten Adventure stages (tile rows, things, scenery, the tiles each stage uses, start / checkpoint / exit / boss arena) and 17 tiles (about 1 MB of source) |
+| `backgrounds_data.h` | generated, do not edit: the ten painted stage backgrounds, 1280 x 714 JPEG, 1.85 MB in all |
+| `third_party/stb_image.h` | stb_image v2.30 (MIT / public domain, nothings/stb commit f58f558), only its JPEG decoder is compiled |
 | `sprite.c` | Blizzard's character sprites: decodes `sprites_data.h` once per picture size, pre-scales every frame to the game tile with an area filter, alpha blit with mirroring, squash/stretch, lean and a white hit flash |
-| `sprites_data.h` | generated, do not edit: the character, boss and effect frames as 255-colour palettes + run-length coded pixels, six palette-swapped buddy skins (about 930 KB of pixel data) |
-| `assets/` | `src/`: the character art pack as supplied (strips and its README), `src/bosses/`: the boss and effects pack as supplied; `blizzard_atlas.png` + `blizzard_atlas.json`: the cleaned frames, anchors and animations made from them |
+| `sprites_data.h` | generated, do not edit: the character, boss, effect and prop frames as 255-colour palettes + run-length coded pixels, six palette-swapped buddy skins (about 715 KB of pixel data) |
+| `assets/` | `src/rich/` (git-ignored, fetched by `tools/originals-assets/fetch_rich_pack.sh`): the rich art pack all the art now comes from; `src/levels/`: the level pack whose ten layouts the stages are converted from; `src/` and `src/bosses/`: the first character and boss packs, kept for reference; `blizzard_atlas.png` + `blizzard_atlas.json`: the cleaned frames, anchors and animations; `adventure_levels.json`: the converted stages |
 | `snake.c` | the game: grid logic, smooth sliding snake, wrap/walls, bonus fruit, title screen with an autopilot snake, pause, game over, particles |
 | `gfx.c` | software renderer: anti-aliased rounded rectangles / circles / rings, dithered gradient, vignette, 5x7 pixel font |
 | `snd.c` | sound effects and a small looping chiptune, all synthesised in code (square / triangle / noise voices with pitch slides); no audio files |
@@ -53,8 +55,8 @@ fruit appears after every 5th apple. Best scores are kept per mode and speed in 
 ## Blizzard Buddies
 
 An original game (own name, characters and levels; nothing taken from any other game). The buddy, the five small
-monsters and the three bosses are sprites from generated art packs made for the game (`assets/src`); the scenery,
-snowballs, ghost and fireballs are drawn in code. Throw snow (A) at the monsters:
+monsters, the three bosses, fireballs, ice balls and Adventure's tiles, props and backgrounds come from a generated art
+pack made for the game (`assets/src/rich`); the arena scenery, snowballs and ghost are drawn in code. Throw snow (A) at the monsters:
 three hits bury one in a snowball, walk into the ball to roll it, and it flattens every monster in its way. Move with the D-pad or
 stick, jump with B or Up, drop through a platform with Down + jump. Pad 2's Start joins a second player at any time (Start on pad 2
 at the title starts a co-op game). Best total score and menu choices are kept in the cartridge save.
@@ -73,46 +75,41 @@ It is drawn on a 32 x 18 tile board (a tile is height / 18 pixels, so 960x540, 1
 
 ### Character sprites
 
-`tools/originals-sprites/build_sprites.py` (Python 3 with Pillow and numpy) turns the art in `assets/src` into
-`assets/blizzard_atlas.png`, `assets/blizzard_atlas.json` and `sprites_data.h`; rerun it after changing the art or its
-frame lists (`--preview sheet.png` also writes every animation on one sheet). The strips are not a grid, so the script:
-cleans the alpha haze around the art, finds each body and splits touching ones at the thinnest column, drops labels, stars,
-projectiles and other loose effects, erases the few effects attached to a body, recolours the anti-aliased edge so no
-coloured glow shows, scales each character once and anchors all its frames at the feet (the flyer and the effects at
-their centre). Characters are drawn 18% bigger than the first sprite version, the bosses 18% bigger than their 2.5-tile
-hit box; hit boxes, physics and the feet line did not change. The bosses come from the right half of
-`src/bosses/complete_character_and_boss_sheet.png` (the boss strips beside it cut off the ogre's second row) and are
-picked by a point on each drawing (`at:x,y`). Their art is small, so it is stored at fewer pixels per tile (scaled up
-1.3x at most in the script) and the game scales it the rest of the way once, when the picture size is set. Frames whose effects are painted over the body are left out (listed per character in the JSON's
-`omitted`): the walker's slash and smoke frames, the hopper's attack, the spitter's spat balls and a glitchy hit pose,
-the yeti's run and charge, which stand in a snow cloud, the ogre's idle (a double exposure) and walk (the club changes
-hands between frames), the wizard's walk (drawn smaller; he hovers) and the ice spikes (no move uses them). The game makes the yeti's walk and charge from its idle frames
-(a waddle, a forward lean, and the dust puffs drawn in code). The frame lists refer to bodies by their order in the strip;
-the script stops if a strip yields a different number of bodies, so a change to the art cannot silently shift them.
+All the art comes from the rich art pack (64 MB, kept out of git: `tools/originals-assets/fetch_rich_pack.sh`
+downloads it from the repository's `Snowbros` release, checks its SHA-256 and unpacks it into `assets/src/rich`). Its
+characters, enemies and bosses come as one PNG per pose. `tools/originals-sprites/build_sprites.py` (Python 3 with
+Pillow and numpy) turns them into `assets/blizzard_atlas.png`, `assets/blizzard_atlas.json` and `sprites_data.h`; rerun
+it after changing the art or its frame lists (`--preview sheet.png` also writes every animation on one sheet). Per
+frame it cleans the alpha haze, keeps the largest body (dropping loose sparks; the spitter keeps its ice ball when it is
+a quarter of the body), erases the one effect attached to a body (the buddy's snowball in the throw, which the game
+draws as the shot), recolours the anti-aliased edge so no glow shows, scales each character once to its height and
+anchors all its frames at the feet (the flyer, the effects, coins and gems at their centre). A picture used by several
+animations is stored once.
 
-In the game: idle / run / jump (picked by vertical speed) / throw / hit then death for the buddies; walk, jump, hit and
-death for the walker; crouch (idle), jump, hit, death for the hopper; fly, hit, death for the flyer; walk, spit wind-up
-(attack), hit, death for the spitter; idle-based walk and charge, a dizzy pose when stunned, hit and death for the yeti.
-Bosses: one drawing per pose. The ogre walks in its idle pose with a waddle and the pack's footstep dust, winds up
-before it throws, and swings (with the pack's whoosh) while its fireball leaves; the rage ogre roars (fire aura) before
-and punches (fire streak) after; the wizard idles in a frost aura and casts around his shots, which are the pack's ice
-balls growing out of his hand. A rolled snowball shows the hit pose with the pack's stars circling for about 0.7 s, a
-snow hit a short white flash; death is the knocked-out pose in the pack's snow cloud. The yeti's stun stars and charge
-puffs are pack art too. Shots still leave from the same point and time; the poses are timed from the game state (the
-fire timer, a just-fired shot), so save states still restore the exact picture. Fireballs, the wizard's aura and the
-health bars are drawn in code (the packs have none).
+Sizes: the buddy and the small monsters are drawn 1.25 times their hit box height, the bosses 118% of their 2.5-tile
+hit box; hit boxes, physics and the feet line are unchanged.
 
-Positions, speeds and hit boxes are unchanged; only the drawing is new. If the sprites cannot be set up (no memory) the
-characters are drawn in code as before.
+In the game: idle / run / jump (rising, falling) / throw (wind-up, release) / hit then death for the buddies; idle, run,
+jump, hit and death for the walker and the hopper (with a blink); flap, hit and death for the flyer; walk, spit, hit and
+death for the spitter; walk, charge, a dazed pose (with the pack's stars) when stunned, hit and death for the yeti.
+Bosses: the ogre walks with its idle and walk frames, a waddle and the pack's footstep dust, jumps up before it throws
+and punches as its fireball leaves; the rage ogre roars before and swings its fire arm after, and charges head down in
+its last third of health; the wizard idles in a frost aura, raises his staff before a shot and summons ice spikes as it
+leaves, the shot being the pack's ice ball growing out of his hand. Fireballs are the pack's (flickering between two
+sizes), a spitter's shot is its ice orb. A rolled snowball shows the hit pose with stars circling; death is the
+knocked-out pose in the pack's snow cloud. Poses are timed from the game state (the fire timer, a just-fired shot), so
+save states still restore the exact picture. The health bars and the wizard's aura are drawn in code.
+
+If the sprites cannot be set up (no memory) the characters are drawn in code as before.
 
 ### Adventure mode (the level pack)
 
 The title's MODE row picks ARENA (the one-screen game above, unchanged) or ADVENTURE: ten side-scrolling stages made from
-the supplied level pack (`assets/src/levels`: 32 px tiles, props, five parallax backgrounds, ten JSON layouts). The
+the supplied level pack's ten JSON layouts (`assets/src/levels`), drawn with the rich pack's art. The
 pack's JSON is not the game's format and is not read at run time: `tools/originals-levels/convert_levels.py` converts it
 into the same tile kinds the arena uses (solid, one-way, ice, plus crates) on boards up to 140 x 20 tiles, writes
 `levels_data.h` and `assets/adventure_levels.json` (the converted levels with every fix and check), and stops if any
-check fails. A game tile is the pack's 32 px tile; the camera shows 32 x 18 of them, follows the players (both stay on
+check fails. The camera shows 32 x 18 game tiles, follows the players (both stay on
 screen in co-op), moves in whole pixels so tiles never seam, and stops at the world's edges.
 
 Physics, hit boxes and controls are the arena's. New in Adventure: pits (falling in costs a life), spikes, springs, coins
@@ -130,8 +127,17 @@ What the converter fixes in the pack (all listed per level in `adventure_levels.
   checkpoint) or along the pit's bottom;
 * level 2 asks for a 5-row climb (a full jump is 4.86 rows): a spring is added; ladders lead nowhere a jump can't reach
   (and Up is jump), so they are scenery;
-* the pack's other art is used too: a gem per level over its highest platform, lamps, crates in the mine, cloud
-  platforms (one-way) for Windy Heights.
+* a gem per level over its highest platform, lamps, crates in the mine, cloud platforms (one-way) for Windy Heights.
+
+Art (the rich pack): each stage has its own painted background (snowy forest, ice cave, mountain cliffs, frozen
+castle, lava cavern, windy heights, ancient ruins, underground mine, crystal peak, the final castle) and its own pair of 64 px
+tiles for surfaces and fill, plus one-way, lava pit and crate tiles where the stage has them. The backgrounds are not
+drawn to tile, so instead of repeating layers each is drawn 8% taller than the screen and slid across that margin as
+the camera crosses the stage (a slow parallax). Coins spin, gems sparkle, the checkpoint flag turns from red to blue,
+the exit is the pack's stone arch (barred until the final boss falls), lanterns glow; springs and spikes are the pack's
+too. The converter places scenery from the pack (a sign at the start, a chest by the exit, and per theme trees, barrels,
+mine carts, crystals or rocks about every seven tiles of open ground, never on the way or in the arena). The pack's own
+21 x 12 level files are one screen each, smaller than these stages, so they are not used.
 
 Validation: the converter ports the game's movement code (update_player / move_body) and searches every spot a player
 can stand on from the start and from the checkpoint, with full and short jumps, run-ups and springs, never standing on
@@ -143,9 +149,10 @@ also finished by the game itself.
 Final stage: walking into the arena shuts the gate, locks the camera and calls the rage ogre. Three phases by health
 (more fire, faster, shorter pauses), each announced; minions drop in; when it falls the barred door opens.
 
-Sizes: the buddy and the small monsters are drawn 1.25 times their hit box height (the 48 px hit box rule of the pack:
-a 1.0-tile player is 1.25 tiles tall; the bat's frame adds its wings), bosses 118% of their 2.5-tile hit box, about
-2.7 times a small monster. Feet stay on the bottom centre of the body.
+Cost: the backgrounds add 1.85 MB to the library (JPEG) and the tiles 0.3 MB; the stripped library grew from 1.1 to
+3.1 MB per ABI (the sprites shrank a little, 830 to 715 KB). A stage's background is
+decoded when the stage starts (2.2 MB in memory at 720p, 4.9 MB at 1080p, replaced by the next stage's; on the test
+host the decode and scale take 36 ms at 720p and 69 ms at 1080p, once per stage).
 
 ## Adding another game
 

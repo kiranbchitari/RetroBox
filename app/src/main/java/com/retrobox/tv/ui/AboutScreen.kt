@@ -55,6 +55,7 @@ internal fun licenseTitle(file: String): String {
         "THIRD_PARTY_NOTICES.txt" -> "Third-party notices (summary)"
         "Apache-2.0.txt" -> "AndroidX, Jetpack Compose, TV Material — Apache-2.0"
         "libretro-h-MIT.txt" -> "libretro API header — MIT"
+        "stb_image-MIT.txt" -> "stb_image (Blizzard Buddies backgrounds) — MIT"
         else -> file.removeSuffix(".txt")
     }
 }

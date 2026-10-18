@@ -48,7 +48,7 @@ typedef struct {
     float x, y, vx, vy, by, kb;
     float hx, pr;                          /* adventure: home x and patrol half-width (0 = free) */
 } Enemy;
-typedef struct { int32_t used, life, owner, power; float x, y, vx, vy; } Shot;    /* owner 0/1 = player, 2 = monster fire (power 2: the wizard's ice) */
+typedef struct { int32_t used, life, owner, power; float x, y, vx, vy; } Shot;    /* owner 0/1 = player, 2 = monster fire (power: 1 fire, 2 the wizard's ice, 3 a spitter's ice; drawing only) */
 typedef struct { int32_t used, type, life; float x, y, vy; } Item;
 
 typedef struct {
@@ -314,7 +314,7 @@ static void start_level(int level) {
     st.levelFrames = 0; st.missed = 0; st.hurry = 0; st.comboCount = 0; st.comboTimer = 0; st.bannerTimer = 0;
     if (adventure()) {
         adv_build();
-        lv_theme(stage_def()->theme);
+        lv_background(st.level - 1);
         for (int i = 0; i < 2; i++) if (st.pl[i].active && st.pl[i].lives > 0) spawn_player(i);
         snap_camera();
         st.phase = PH_INTRO; st.timer = 0;
@@ -605,7 +605,7 @@ static void update_enemy(Enemy *e) {
         }
         if (e->type == E_SHOOT && --e->cd <= 0 && target >= 0 && fabs_(py - e->y) < 1.6f && fabs_(px - e->x) < 13.f && e->snow == 0) {
             e->dir = px > e->x ? 1 : -1;
-            add_shot(e->x + (float)e->dir * .6f, e->y - .5f, (float)e->dir * .13f * dmul(), 0.f, 100, 2, 1);
+            add_shot(e->x + (float)e->dir * .6f, e->y - .5f, (float)e->dir * .13f * dmul(), 0.f, 100, 2, 3);   /* power 3: drawn as the spitter's ice */
             e->cd = 95 + irnd(50);
         }
         break; }
@@ -1321,8 +1321,8 @@ static void draw_buddy(int skin, float fx, float fy, float uu, int dir, int anim
     int fr;
     float sx = 1.f, sy = 1.f;
     if (deadT) fr = deadT < 24 ? spr_frame(SPR_BUDDY_HIT, deadT / 8, 0) : spr_frame(SPR_BUDDY_DEATH, (deadT - 24) / 7, 0);
-    else if (throwT > 0) fr = spr_frame(SPR_BUDDY_ATTACK, (10 - throwT) * 4 / 10, 0);
-    else if (air) fr = spr_frame(SPR_BUDDY_JUMP, vy < -.3f ? 0 : (vy < -.05f ? 1 : (vy < .15f ? 2 : 3)), 0);
+    else if (throwT > 0) fr = spr_frame(SPR_BUDDY_ATTACK, (10 - throwT) * spr_count(SPR_BUDDY_ATTACK) / 10, 0);
+    else if (air) fr = spr_frame(SPR_BUDDY_JUMP, vy < 0.f ? 0 : 1, 0);              /* rising, falling */
     else if (moving) fr = spr_frame(SPR_BUDDY_RUN, anim / 5, 1);
     else fr = spr_frame(SPR_BUDDY_IDLE, anim / 10, 1);
     if (!deadT && land > 0) { sy = 1.f - .12f * (float)land / 7.f; sx = 1.f + .08f * (float)land / 7.f; }   /* squash on landing */
@@ -1389,7 +1389,8 @@ static void draw_boss_sprite(const Enemy *e, float px, float py, float uu) {
         }
         if (dying) fr = spr_frame(SPR_WIZARD_DEATH, 0, 0);
         else if (dazed) fr = spr_frame(SPR_WIZARD_HIT, 0, 0);
-        else if (fired || windup) fr = spr_frame(SPR_WIZARD_CAST, 0, 0);
+        else if (fired) fr = spr_frame(SPR_WIZARD_CAST, 1, 0);                      /* the summon */
+        else if (windup) fr = spr_frame(SPR_WIZARD_CAST, 0, 0);
         else fr = spr_frame(SPR_WIZARD_IDLE, t / 12, 1);
     } else {
         int rage = e->kind == 2;
@@ -1398,8 +1399,10 @@ static void draw_boss_sprite(const Enemy *e, float px, float py, float uu) {
         else if (dazed) fr = rage ? spr_frame(SPR_RAGE_HIT, 0, 0) : spr_frame(SPR_OGRE_HIT, 0, 0);
         else if (fired) fr = rage ? spr_frame(SPR_RAGE_ATTACK, 0, 0) : spr_frame(SPR_OGRE_ATTACK, 1, 0);
         else if (windup && e->ground) fr = rage ? spr_frame(SPR_RAGE_ROAR, 0, 0) : spr_frame(SPR_OGRE_ATTACK, 0, 0);
+        else if (rage && e->hp * 3 <= boss_max(e->kind, st.level) && e->ground && fabs_(e->vx) > .05f)
+            fr = spr_frame(SPR_RAGE_CHARGE, 0, 0);               /* the last third: head down, charging */
         else {
-            fr = idle;
+            fr = rage ? idle : spr_frame(SPR_OGRE_IDLE, t / 15, 1);      /* the ogre's idle and walk frames */
             if (e->ground) {                                     /* a heavy waddle: bob and footstep dust */
                 float ph = (float)t * (rage ? .2f : .15f);
                 ay -= fabs_(sinf(ph)) * .08f * uu;
@@ -1428,9 +1431,8 @@ static void draw_boss_sprite(const Enemy *e, float px, float py, float uu) {
     gfx_rrect(&fb, px - 1.2f * uu + .02f * uu, by + .02f * uu, (2.4f * uu - .04f * uu) * frac, .12f * uu, .06f * uu, wizard ? RGB(120, 200, 255) : RGB(255, 90, 90), 255);
 }
 
-/* The five small monsters as sprites. Poses the art does not have are built from the ones it has: the yeti's walk and
- * charge are its idle frames with a bob or a forward lean (its run frames stand in a painted snow cloud). Returns 0 for
- * the ghost (drawn in code) or without sprites. */
+/* The five small monsters as sprites, one pose per game state; the charger's dust and dizzy stars are the pack's
+ * effects. Returns 0 for the ghost (drawn in code) or without sprites. */
 static int draw_enemy_sprite(const Enemy *e, float px, float py, float uu) {
     if (!spr_ready() || e->type == E_GHOST) return 0;
     if (e->type == E_BOSS) { draw_boss_sprite(e, px, py, uu); return 1; }
@@ -1441,11 +1443,11 @@ static int draw_enemy_sprite(const Enemy *e, float px, float py, float uu) {
     float ax = px, ay = py;
     int fr;
     float vy = e->vy;
-    int jumpI = vy < -.3f ? 0 : (vy < 0.f ? 1 : (vy < .2f ? 2 : 3));
+    int jumpI = vy < 0.f ? 0 : 1;                                /* rising, falling */
     switch (e->type) {
     case E_WALK:
         if (dying) fr = spr_frame(SPR_WALKER_DEATH, e->timer / 7, 0);
-        else if (hit) fr = spr_frame(SPR_WALKER_HIT, hitI, 0);
+        else if (hit) fr = spr_frame(SPR_WALKER_HIT, hitI * 2 / 3, 0);
         else if (!e->ground) fr = spr_frame(SPR_WALKER_JUMP, jumpI, 0);
         else fr = spr_frame(SPR_WALKER_RUN, t / (7 + 3 * e->snow), 1);
         break;
@@ -1464,18 +1466,17 @@ static int draw_enemy_sprite(const Enemy *e, float px, float py, float uu) {
     case E_SHOOT:
         if (dying) fr = spr_frame(SPR_SPITTER_DEATH, e->timer / 8, 0);
         else if (hit) fr = spr_frame(SPR_SPITTER_HIT, hitI, 0);
-        else if (e->cd < 22 && e->cd > 0 && e->snow == 0) fr = spr_frame(SPR_SPITTER_ATTACK, (22 - e->cd) * 3 / 22, 0);
-        else if (!e->ground) fr = spr_frame(SPR_SPITTER_WALK, 0, 0);
+        else if (e->cd < 22 && e->cd > 0 && e->snow == 0) fr = spr_frame(SPR_SPITTER_ATTACK, 0, 0);
+        else if (!e->ground) fr = spr_frame(SPR_SPITTER_IDLE, 0, 0);
         else fr = spr_frame(SPR_SPITTER_WALK, t / (8 + 3 * e->snow), 1);
         break;
     case E_CHARGE: {
         int charging = e->cd > 0, stunned = e->timer > 0;
         if (dying) fr = spr_frame(SPR_CHARGER_DEATH, e->timer / 8, 0);
         else if (hit) fr = spr_frame(SPR_CHARGER_HIT, 0, 0);
-        else if (stunned) fr = spr_frame(SPR_CHARGER_HIT, 2, 0);
+        else if (stunned) fr = spr_frame(SPR_CHARGER_HIT, 0, 0);
         else if (charging) {
-            fr = spr_frame(SPR_CHARGER_IDLE, t / 3, 1);
-            d.lean = .22f;
+            fr = spr_frame(SPR_CHARGER_ATTACK, 0, 0);
             ax += sinf((float)t * 1.6f) * .03f * uu;
             ay -= fabs_(sinf((float)t * .5f)) * .06f * uu;
             for (int k = 1; k <= 3; k++) {                                     /* snow puffs kicked up behind */
@@ -1483,8 +1484,7 @@ static int draw_enemy_sprite(const Enemy *e, float px, float py, float uu) {
                 spr_draw(&fb, spr_frame(SPR_FX_CLOUD, 0, 0), px - (float)e->dir * (.45f + (float)k * .32f) * uu, py - .2f * uu, &pd);
             }
         } else {
-            fr = spr_frame(SPR_CHARGER_IDLE, t / 8, 1);
-            if (e->ground) ay -= fabs_(sinf((float)t * .2f)) * .05f * uu;     /* a heavy waddle */
+            fr = e->ground ? spr_frame(SPR_CHARGER_WALK, t / (8 + 3 * e->snow), 1) : spr_frame(SPR_CHARGER_IDLE, 0, 0);
         }
         break; }
     default: return 0;
@@ -1492,8 +1492,6 @@ static int draw_enemy_sprite(const Enemy *e, float px, float py, float uu) {
     spr_draw(&fb, fr, ax, ay, &d);
     if (dying) return 1;
     float top = ay - spr_top(fr) * uu;
-    if (e->type == E_SHOOT && e->cd < 22 && e->cd > 0 && e->snow == 0)                      /* about to spit */
-        gfx_circle(&fb, px + (float)e->dir * .5f * uu, py - .45f * uu, .13f * uu * (1.f + (float)(22 - e->cd) * .03f), RGB(255, 140, 40), 220);
     if (e->type == E_CHARGE && e->timer > 0) dizzy_stars(px, top - .1f * uu, .4f * uu, e->anim, uu * .7f);
     if (e->snow > 0) snow_cap(px, top + .1f * uu, uu, e->snow);
     return 1;
@@ -1674,7 +1672,13 @@ static void draw_shot(const Shot *s) {
         int age = 130 - s->life;
         SprDraw d = {uu, 1.f, 1.f, 0.f, s->vx < 0.f, 0, 255, 0};
         spr_draw(&fb, spr_frame(SPR_FX_ICEBALL, age / 3, 0), x, y, &d);
-    } else {                                                       /* fireballs: the art pack has none, drawn in code */
+    } else if (s->power == 3 && spr_ready()) {                     /* the spitter's ice ball */
+        SprDraw d = {uu * .8f, 1.f, 1.f, 0.f, s->vx < 0.f, 0, 255, 0};
+        spr_draw(&fb, spr_frame(SPR_FX_ICEBALL, 1, 0), x, y, &d);
+    } else if (spr_ready()) {                                      /* the ogres' fireballs */
+        SprDraw d = {uu, 1.f, 1.f, 0.f, s->vx < 0.f, 0, 255, 0};
+        spr_draw(&fb, spr_frame(SPR_FX_FIRE, (130 - s->life) / 5, 1), x, y, &d);
+    } else {
         gfx_circle(&fb, x - s->vx * uu * 2.f, y, .16f * uu, RGB(255, 140, 40), 130);
         gfx_circle(&fb, x, y, .26f * uu, RGB(255, 120, 40), 255);
         gfx_circle(&fb, x, y, .14f * uu, RGB(255, 226, 120), 255);
@@ -1721,49 +1725,61 @@ static void draw_adv_world(void) {
     int c0 = camPx / cell - 1, r0 = camPy / cell - 1;
     for (int r = r0 < 0 ? 0 : r0; r < st.wh && r <= r0 + TH + 2; r++)
         for (int c = c0 < 0 ? 0 : c0; c < st.ww && c <= c0 + TW + 2; c++) {
-            int k = st.tile[r][c];
-            if (!k) continue;
-            int top = r == 0 || st.tile[r - 1][c] == 0 || st.tile[r - 1][c] == 5 || is_oneway(k);
-            lv_draw_tile(&fb, k == 5 ? LV_ART_CRATE : L->art, top, ox + c * cell - camPx + (int)shx, r * cell - camPy + (int)shy);
+            int k = st.tile[r][c], t;
+            int X = ox + c * cell - camPx + (int)shx, Y = r * cell - camPy + (int)shy;
+            if (!k) {                                          /* a lava pit's bottom (lava stages): the stage's lava tile */
+                if (r == st.wh - 1 && L->tPit != LV_TILE_NONE) lv_draw_tile(&fb, L->tPit, X, Y);
+                continue;
+            }
+            if (k == 5) t = L->tCrate;
+            else if (is_oneway(k)) t = L->tOneway != LV_TILE_NONE ? L->tOneway : L->tTop;
+            else t = (r == 0 || st.tile[r - 1][c] == 0 || st.tile[r - 1][c] == 5 || is_oneway(st.tile[r - 1][c])) ? L->tTop : L->tFill;
+            lv_draw_tile(&fb, t, X, Y);
         }
     if (!spr_ready()) return;
-    /* scenery and things: ladders and lamps behind, then the door, the flag, hazards, springs, coins and gems */
+    /* scenery behind everything that plays: decorations, ladders, lanterns */
+    static const int DECO_SPR[7] = {SPR_TREE_IDLE, SPR_SIGN_IDLE, SPR_BARREL_IDLE, SPR_CART_IDLE, SPR_CRYSTAL_IDLE, SPR_CHEST_IDLE, SPR_ROCK_IDLE};
     for (int k = 0; k < L->nthings; k++) {
         const LvThing *t = &L->things[k];
         float x = PX((float)t->x + .5f), y = PY((float)t->y);
-        if (t->kind == LV_LADDER) prop(SPR_LADDER_IDLE, x, y, uu, (float)t->arg * .5f, 255, 0);
+        if (t->kind == LV_DECO && t->arg < 7) {
+            SprDraw d = {uu, 1.f, 1.f, 0.f, (t->x * 7 + t->y) & 1, 0, 255, 0};          /* every other one mirrored */
+            spr_draw(&fb, spr_frame(DECO_SPR[t->arg], t->x + st.level, 1), x, y, &d);
+        } else if (t->kind == LV_LADDER) prop(SPR_LADDER_IDLE, x, y, uu, (float)t->arg * .5f, 255, 0);
         else if (t->kind == LV_LAMP) {
-            gfx_circle(&fb, x, y - 1.45f * uu, (.9f + .05f * sinf((float)st.frame * .1f + (float)k)) * uu, RGB(255, 210, 120), 34);   /* glow: no such art */
+            gfx_circle(&fb, x, y - 1.55f * uu, (.8f + .05f * sinf((float)st.frame * .1f + (float)k)) * uu, RGB(255, 200, 110), 38);   /* the lantern's glow */
             prop(SPR_LAMP_IDLE, x, y, uu, 1.f, 255, 0);
         }
     }
     float dx = PX((float)L->exitX + .5f), dy = PY((float)L->exitY);
-    if (st.exitOpen) gfx_circle(&fb, dx, dy - uu, (1.1f + .08f * sinf((float)st.frame * .12f)) * uu, RGB(140, 220, 255), 40);
-    prop(SPR_DOOR_IDLE, dx, dy, uu, 1.f, st.exitOpen ? 255 : 150, 0);
+    if (st.exitOpen) gfx_circle(&fb, dx, dy - 1.1f * uu, (1.2f + .08f * sinf((float)st.frame * .12f)) * uu, RGB(140, 220, 255), 40);
+    prop(SPR_DOOR_IDLE, dx, dy, uu, 1.f, st.exitOpen ? 255 : 170, 0);
     if (!st.exitOpen)                                          /* barred until the boss falls */
-        for (int b = 0; b < 2; b++) gfx_rrect(&fb, dx - .62f * uu, dy - (1.45f - .7f * (float)b) * uu, 1.24f * uu, .14f * uu, .06f * uu, RGB(70, 50, 40), 255);
+        for (int b = 0; b < 2; b++) gfx_rrect(&fb, dx - .7f * uu, dy - (1.35f - .6f * (float)b) * uu, 1.4f * uu, .16f * uu, .06f * uu, RGB(70, 50, 40), 255);
     float fx = PX((float)L->cpX + .5f), fy = PY((float)L->cpY);
-    if (st.cpReached) gfx_circle(&fb, fx, fy - .9f * uu, .9f * uu, RGB(140, 255, 170), 30);
-    { SprDraw d = {uu, st.cpReached ? 1.f + .04f * sinf((float)st.frame * .15f) : 1.f, 1.f, 0.f, 0, 0, st.cpReached ? 255 : 160, 0};
-      spr_draw(&fb, spr_frame(SPR_FLAG_IDLE, 0, 0), fx, fy, &d); }
+    if (st.cpReached) gfx_circle(&fb, fx, fy - 1.f * uu, .9f * uu, RGB(140, 200, 255), 30);
+    { SprDraw d = {uu, st.cpReached ? 1.f + .04f * sinf((float)st.frame * .15f) : 1.f, 1.f, 0.f, 0, 0, 255, 0};
+      spr_draw(&fb, spr_frame(SPR_FLAG_IDLE, st.cpReached, 0), fx, fy, &d); }          /* red flag, blue once passed */
     for (int k = 0; k < L->nthings; k++) {
         const LvThing *t = &L->things[k];
         float x = PX((float)t->x + .5f), y = PY((float)t->y);
         switch (t->kind) {
         case LV_SPIKES: prop(SPR_SPIKES_IDLE, x, y, uu, 1.f, 255, 0); break;
-        case LV_PITSPIKES:                                     /* the bottom of a pit, all the way across */
-            for (int c = t->x; c >= 0 && tile_at(c, st.wh - 1) == 0; c--) prop(SPR_SPIKES_IDLE, PX((float)c + .5f), PY((float)st.wh), uu, 1.f, 200, 0);
-            for (int c = t->x + 1; c < st.ww && tile_at(c, st.wh - 1) == 0; c++) prop(SPR_SPIKES_IDLE, PX((float)c + .5f), PY((float)st.wh), uu, 1.f, 200, 0);
+        case LV_PITSPIKES:                                     /* the bottom of a pit, all the way across (lava stages: lava) */
+            if (L->tPit != LV_TILE_NONE) break;
+            for (int c = t->x; c >= 0 && tile_at(c, st.wh - 1) == 0; c--) prop(SPR_SPIKES_IDLE, PX((float)c + .5f), PY((float)st.wh), uu, 1.f, 220, 0);
+            for (int c = t->x + 1; c < st.ww && tile_at(c, st.wh - 1) == 0; c++) prop(SPR_SPIKES_IDLE, PX((float)c + .5f), PY((float)st.wh), uu, 1.f, 220, 0);
             break;
         case LV_SPRING: prop(SPR_SPRING_IDLE, x, y, uu, 1.f, 255, 0); break;
         case LV_COIN: case LV_GEM:
             if (st.taken >> k & 1u) break;
             {
-                float spin = t->kind == LV_COIN ? .35f + .65f * fabs_(cosf((float)st.frame * .05f + (float)k)) : 1.f;
-                float bob = sinf((float)st.frame * .08f + (float)k) * .06f * uu;
-                SprDraw d = {uu, spin, 1.f, 0.f, 0, 0, 255, 0};
-                if (t->kind == LV_GEM) gfx_circle(&fb, x, PY((float)t->y + .5f) + bob, .5f * uu, RGB(255, 120, 200), 40);
-                spr_draw(&fb, spr_frame(t->kind == LV_COIN ? SPR_COIN_IDLE : SPR_GEM_IDLE, 0, 0), x, PY((float)t->y + .5f) + bob, &d);
+                float bob = sinf((float)st.frame * .08f + (float)k) * .06f * uu, cy = PY((float)t->y + .5f) + bob;
+                SprDraw d = {uu, 1.f, 1.f, 0.f, 0, 0, 255, 0};
+                if (t->kind == LV_GEM) {
+                    gfx_circle(&fb, x, cy, .55f * uu, k & 1 ? RGB(120, 230, 255) : RGB(255, 110, 140), 40);
+                    spr_draw(&fb, spr_frame(SPR_GEM_IDLE, k & 1, 0), x, cy, &d);                  /* ruby or diamond */
+                } else spr_draw(&fb, spr_frame(SPR_COIN_IDLE, st.frame / 8 + k, 1), x, cy, &d);     /* spinning */
             }
             break;
         default: break;
@@ -1876,7 +1892,7 @@ static void draw_banner(void) {
     char b[48];
     if (st.phase == PH_INTRO) {
         int a = st.timer < 12 ? st.timer * 21 : (st.timer > 90 ? (110 - st.timer) * 12 : 255);
-        if (a < 0) a = 0; if (a > 255) a = 255;
+        a = a > 255 ? 255 : (a < 0 ? 0 : a);
         dim(a / 3);
         if (adventure()) {
             snprintf(b, sizeof b, "STAGE %d", st.level);
@@ -1917,14 +1933,14 @@ static void draw_banner(void) {
         }
     } else if (st.bannerTimer > 0 && adventure() && st.arenaOn == 1) {     /* the final boss: its arrival, then each phase */
         int a = st.bannerTimer > 80 ? (100 - st.bannerTimer) * 12 : (st.bannerTimer < 20 ? st.bannerTimer * 12 : 255);
-        if (a > 255) a = 255; if (a < 0) a = 0;
+        a = a > 255 ? 255 : (a < 0 ? 0 : a);
         if (st.bossPhase <= 1) snprintf(b, sizeof b, "BOSS FIGHT!"); else snprintf(b, sizeof b, "RAGE PHASE %d!", st.bossPhase);
         gfx_text_c(&fb, cxp + u(4), u(220) + u(4), fs(12), b, RGB(0, 0, 0), a / 2);
         gfx_text_c(&fb, cxp, u(220), fs(12), b, RGB(255, 110, 90), a);
         if (st.bossPhase >= 3) gfx_text_c(&fb, cxp, u(340), fs(3.2f), "FASTER, MORE FIRE: HANG ON!", C_TEXT, a);
     } else if (st.bannerTimer > 0 && st.hurry) {
         int a = st.bannerTimer > 90 ? (110 - st.bannerTimer) * 12 : (st.bannerTimer < 20 ? st.bannerTimer * 12 : 255);
-        if (a > 255) a = 255; if (a < 0) a = 0;
+        a = a > 255 ? 255 : (a < 0 ? 0 : a);
         gfx_text_c(&fb, cxp + u(4), u(220) + u(4), fs(12), "HURRY UP!", RGB(0, 0, 0), a / 2);
         gfx_text_c(&fb, cxp, u(220), fs(12), "HURRY UP!", ((st.bannerTimer / 6) & 1) ? RGB(255, 100, 100) : C_TEXT, a);
         gfx_text_c(&fb, cxp, u(350), fs(3.2f), "A GHOST IS COMING FOR YOU", C_DIM, a);
@@ -1969,13 +1985,36 @@ static void blit_bg(int dx, int dy) {
 
 #ifdef RB_SPRITE_GALLERY
 /* Test builds: every sprite frame at play size, one row per character, plus each animation playing, for checking the
- * art at each resolution with tools/core-harness. Two pages, two seconds each: the small characters (and the buddy
- * skins), then the bosses and the effects. */
+ * art at each resolution with tools/core-harness. Three pages, two seconds each: the small characters (and the buddy
+ * skins), the bosses and the effects, then the level props. */
 static void draw_gallery(void) {
-    static const char *const NAMES[SPR_NCHARS] = {"BUDDY", "WALKER", "HOPPER", "FLYER", "SPITTER", "CHARGER", "OGRE", "WIZARD", "RAGE", "FX"};
+    static const char *const NAMES[SPR_NCHARS] = {"BUDDY", "WALKER", "HOPPER", "FLYER", "SPITTER", "CHARGER", "OGRE", "WIZARD", "RAGE", "FX",
+        "COIN", "GEM", "FLAG", "DOOR", "SPIKES", "SPRING", "LAMP", "LADDER", "TREE", "SIGN", "BARREL", "CART", "CRYSTAL", "CHEST", "ROCK"};
+    static const char *const TITLES[3] = {"SPRITE GALLERY 1/3", "SPRITE GALLERY 2/3", "SPRITE GALLERY 3/3"};
     float uu = (float)cell, y = 1.2f * uu;
-    int page = (st.frame / 120) & 1, c0 = page ? SPR_OGRE : 0, c1 = page ? SPR_NCHARS : SPR_OGRE;
-    gfx_text(&fb, u(8), u(6), fs(2), page ? "SPRITE GALLERY 2/2" : "SPRITE GALLERY 1/2", C_GOLD, 255);
+    int page = (st.frame / 120) % 3;
+    gfx_text(&fb, u(8), u(6), fs(2), TITLES[page], C_GOLD, 255);
+    if (page == 2) {                                             /* the props side by side, two rows, feet on a line */
+        float x = 1.f * uu;
+        y = 5.f * uu;
+        for (int c = SPR_COIN; c < SPR_NCHARS; c++) {
+            const SprCharDef *cd = &SPR_CHARS[c];
+            float w = 0.f;
+            for (int f = 0; f < cd->count; f++) w += (float)SPR_FRAMES[cd->first + f].w / cd->ppt + .15f;
+            if (x + w * uu > (float)W - .5f * uu) { x = 1.f * uu; y += 6.f * uu; }
+            gfx_text(&fb, x, y + .6f * uu, fs(1.4f), NAMES[c], C_TEXT, 255);
+            gfx_rrect(&fb, x, y, w * uu, 1.f, 0, RGB(255, 90, 90), 120);
+            for (int f = 0; f < cd->count; f++) {
+                int fr = cd->first + f;
+                SprDraw d = {uu, 1.f, 1.f, 0.f, 0, 0, 255, 0};
+                spr_draw(&fb, fr, x + SPR_FRAMES[fr].ax / cd->ppt * uu, y, &d);
+                x += ((float)SPR_FRAMES[fr].w / cd->ppt + .15f) * uu;
+            }
+            x += .8f * uu;
+        }
+        return;
+    }
+    int c0 = page ? SPR_OGRE : 0, c1 = page ? SPR_COIN : SPR_OGRE;
     for (int c = c0; c < c1; c++) {
         const SprCharDef *cd = &SPR_CHARS[c];
         float rowH = 0.f;
@@ -2006,15 +2045,15 @@ static void draw_gallery(void) {
         y += .4f * uu;
     }
     /* the animations playing, the way the game times them */
-    int a0 = page ? SPR_OGRE_IDLE : 0, a1 = page ? SPR_NANIMS : SPR_OGRE_IDLE;
-    float step = page ? 4.8f : 1.5f, rowH = page ? 3.4f : 1.5f;
+    int a0 = page ? SPR_OGRE_IDLE : 0, a1 = page ? SPR_COIN_IDLE : SPR_OGRE_IDLE;
+    float step = page ? 2.4f : 1.5f, rowH = page ? 1.8f : 1.5f, scale = page ? .5f : 1.f;   /* the bosses at half size */
     x = 3.2f * uu; y += rowH * uu;
     for (int a = a0; a < a1; a++) {
         int fps = SPR_ANIMS[a].fps ? SPR_ANIMS[a].fps : 3;
         int fr = spr_frame(a, st.frame * fps / 60, 1);
         int centred = (a >= SPR_FLYER_IDLE && a <= SPR_FLYER_DEATH) || a >= SPR_FX_ICEBALL;
-        SprDraw d = {uu, 1.f, 1.f, 0.f, 0, 0, 255, 0};
-        spr_draw(&fb, fr, x + step * .5f * uu, centred ? y - .6f * uu : y, &d);
+        SprDraw d = {uu * scale, 1.f, 1.f, 0.f, 0, 0, 255, 0};
+        spr_draw(&fb, fr, x + step * .5f * uu, centred ? y - .6f * uu * scale : y, &d);
         x += step * uu;
         if (x > (float)W - step * uu) { x = 3.2f * uu; y += rowH * uu; }
     }
@@ -2031,8 +2070,9 @@ static void draw(void) {
         float a = (float)(st.shake > 14 ? 14 : st.shake) * u(.6f);
         shx = (float)(int)(sinf((float)st.frame * 2.3f) * a); shy = (float)(int)(cosf((float)st.frame * 3.1f) * a);
     }
-    if (adv) {                                                  /* parallax: the picture at 0.35, snow at 0.5, the world at 1 */
-        if (!lv_draw_bg(&fb, (int)((float)camPx * .35f))) gfx_vgrad(&fb, RGB(20, 30, 70), RGB(60, 70, 130));
+    if (adv) {                     /* parallax: the painting slides within its 8% margin across the whole stage, snow at 0.5 */
+        float fx = st.ww > TW ? st.camx / (float)(st.ww - TW) : 0.f, fy = st.wh > TH ? st.camy / (float)(st.wh - TH) : 0.f;
+        if (!lv_draw_bg(&fb, fx, fy)) gfx_vgrad(&fb, RGB(20, 30, 70), RGB(60, 70, 130));
         draw_snowfall(); draw_adv_world();
     }
     else { blit_bg((int)shx, (int)shy); draw_snowfall(); }
@@ -2089,8 +2129,8 @@ static int bz_setup(int w, int h) {
     ox = (w - TW * cell) / 2;
     bgLevel = -1; bgTitle = -1;
     spr_setup(cell);                                       /* without memory for them the characters are drawn in code */
-    lv_setup(cell, h);
-    if (adventure()) lv_theme(stage_def()->theme);
+    lv_setup(cell, w, h);
+    if (adventure()) lv_background(st.level - 1);
     return 1;
 }
 
@@ -2150,7 +2190,7 @@ static int bz_state_load(const void *src, size_t size) {
     if (!n.rng) n.rng = 0x2545F491u;
     st = n;
     bgLevel = -1;
-    if (adventure()) lv_theme(stage_def()->theme);
+    if (adventure()) lv_background(st.level - 1);
     snd_music(n.screen == S_TITLE ? MUSIC_TITLE : (n.screen == S_OVER ? MUSIC_OFF : MUSIC_PLAY));
     return 1;
 }

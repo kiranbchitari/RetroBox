@@ -307,3 +307,22 @@ stages at 540p: no reports; arena mode levels 7 and 15 still play; title, HUD, b
 fight looked at in dumped frames at 720p and 1080p. Not verified: a person playing the stages (difficulty, monster
 placement, the boss's three phases), save states in Adventure (the device test only covers Arena), the Android build
 and device tests (no NDK here), the Mi TV.
+
+### Blizzard Buddies rich art pack (2026-10-18, host harness only)
+
+All Blizzard art now comes from the rich pack (64 MB, fetched by `tools/originals-assets/fetch_rich_pack.sh` from the
+`Snowbros` release, SHA-256 checked, git-ignored): the buddy, five monsters and three bosses (one PNG per pose), its
+fireballs, ice orbs, stars, dust and cloud, and for Adventure a painted background and its own 64 px tiles per stage,
+spinning coins, gems, red/blue checkpoint flag, stone arch door, lanterns, springs, spikes and scenery (trees, signs,
+barrels, carts, crystals, chests, rocks). Stage layouts, physics, hit boxes and shot origins are unchanged; the pack's own
+one-screen level files are not used. Backgrounds are JPEG decoded by stb_image v2.30 (vendored, MIT). Checked in the
+Linux harness: gcc and clang `-Wall -Wextra` with no warnings; all three gallery pages at 720p and 1080p (every frame on
+its feet line); the route bot (god mode) finishes all ten stages at 720p and 1080p with no deaths, on the same frames at
+both sizes, including the rage ogre's three phases; every stage, the arena fight and the props looked at in dumped
+frames at 720p and 1080p; AddressSanitizer + UndefinedBehaviorSanitizer: all ten stages at 540p, stage 1 at 1080p,
+stage 10 at 720p, Arena levels 5, 7, 10 and 15 at 720p (the ogre and the rage ogre beaten): no reports. Cost here:
+1080p frames 98 vs 100 frames/s before, sprite setup 17 ms (720p) / 29 ms (1080p), tiles 2-3 ms, a stage's background
+decode and scale 36 ms (720p) / 69 ms (1080p) once per stage, background memory 2.2 / 4.9 MB, the stripped core library
+3.1 MB per ABI (was 1.1 MB; about +4 MB for an APK with two ABIs). **Not verified:** the Android build and device
+tests (no NDK here), the Mi TV (speed, the background decode there may take several times longer, memory), a person
+playing, and Arena mode's backgrounds (still drawn in code).

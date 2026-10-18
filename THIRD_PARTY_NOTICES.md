@@ -11,6 +11,7 @@ RetroBox TV loads separately built libretro cores with `dlopen`. Each core keeps
 | gpSP (GBA) | GPL-2.0 | https://github.com/libretro/gpsp |
 | mGBA (GBA) | MPL-2.0 | https://github.com/libretro/mgba |
 | Snes9x 2005 (SNES) | Snes9x license (non-commercial) with GPLv2+ parts | https://github.com/libretro/snes9x2005. **Do not publish or sell an APK containing it**; it is fine for personal use. Leave it out with `./gradlew assembleRelease -Pretrobox.excludeCores=snes9x2005` (add `genesis_plus_gx,picodrive` for the Genesis cores). |
+| stb_image v2.30 (`cores/originals/third_party/stb_image.h`, JPEG decoding in RetroBox Originals) | MIT or public domain, used under MIT (`licenses/stb_image-MIT.txt`) | © 2017 Sean Barrett, https://github.com/nothings/stb |
 | AndroidX / Jetpack Compose / TV Material | Apache-2.0 (`licenses/Apache-2.0.txt`) | |
 
 If you give the APK to anyone, the GPL requires that you also offer the corresponding source: this repository and the pinned core commits listed in `cores/build-cores.sh`. Test-only libraries (JUnit, AndroidX Test, org.json for JVM tests) are not in the APK.

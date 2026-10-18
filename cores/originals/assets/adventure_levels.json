@@ -5,7 +5,10 @@
    "id": 1,
    "name": "Snowy Forest",
    "theme": "snow",
-   "tile_art": "snow_ground",
+   "tiles": {
+    "top": "S01",
+    "fill": "S29"
+   },
    "style": "column",
    "width": 85,
    "height": 20,
@@ -56,6 +59,11 @@
      "y": 12
     },
     {
+     "kind": "gem",
+     "x": 31,
+     "y": 7
+    },
+    {
      "kind": "ladder",
      "x": 18,
      "y": 13,
@@ -82,9 +90,74 @@
      "patrol": 4
     },
     {
-     "kind": "gem",
-     "x": 31,
-     "y": 7
+     "kind": "lamp",
+     "x": 42,
+     "y": 14
+    },
+    {
+     "kind": "lamp",
+     "x": 79,
+     "y": 15
+    },
+    {
+     "kind": "deco",
+     "x": 1,
+     "y": 16,
+     "arg": 1
+    },
+    {
+     "kind": "deco",
+     "x": 74,
+     "y": 15,
+     "arg": 5
+    },
+    {
+     "kind": "deco",
+     "x": 4,
+     "y": 16,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 11,
+     "y": 16,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 20,
+     "y": 13,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 32,
+     "y": 10,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 39,
+     "y": 14,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 53,
+     "y": 11,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 60,
+     "y": 11,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 67,
+     "y": 15,
+     "arg": 0
     }
    ],
    "boss_arena": null,
@@ -100,7 +173,10 @@
    "id": 2,
    "name": "Ice Cave",
    "theme": "cave",
-   "tile_art": "stone",
+   "tiles": {
+    "top": "S17",
+    "fill": "S20"
+   },
    "style": "column",
    "width": 85,
    "height": 20,
@@ -156,6 +232,11 @@
      "y": 10
     },
     {
+     "kind": "gem",
+     "x": 34,
+     "y": 8
+    },
+    {
      "kind": "spikes",
      "x": 24,
      "y": 16
@@ -192,11 +273,6 @@
      "patrol": 4
     },
     {
-     "kind": "gem",
-     "x": 34,
-     "y": 8
-    },
-    {
      "kind": "lamp",
      "x": 44,
      "y": 15
@@ -210,6 +286,60 @@
      "kind": "spring",
      "x": 27,
      "y": 16
+    },
+    {
+     "kind": "deco",
+     "x": 1,
+     "y": 17,
+     "arg": 1
+    },
+    {
+     "kind": "deco",
+     "x": 79,
+     "y": 17,
+     "arg": 5
+    },
+    {
+     "kind": "deco",
+     "x": 4,
+     "y": 17,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 25,
+     "y": 16,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 32,
+     "y": 11,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 53,
+     "y": 12,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 60,
+     "y": 12,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 67,
+     "y": 17,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 74,
+     "y": 17,
+     "arg": 4
     }
    ],
    "boss_arena": null,
@@ -229,7 +359,10 @@
    "id": 3,
    "name": "Mountain Cliffs",
    "theme": "snow",
-   "tile_art": "snow_ground",
+   "tiles": {
+    "top": "S02",
+    "fill": "S28"
+   },
    "style": "column",
    "width": 85,
    "height": 20,
@@ -285,6 +418,11 @@
      "y": 13
     },
     {
+     "kind": "gem",
+     "x": 23,
+     "y": 7
+    },
+    {
      "kind": "ladder",
      "x": 11,
      "y": 13,
@@ -317,9 +455,86 @@
      "patrol": 4
     },
     {
-     "kind": "gem",
-     "x": 23,
-     "y": 7
+     "kind": "lamp",
+     "x": 50,
+     "y": 15
+    },
+    {
+     "kind": "lamp",
+     "x": 84,
+     "y": 17
+    },
+    {
+     "kind": "deco",
+     "x": 1,
+     "y": 17,
+     "arg": 1
+    },
+    {
+     "kind": "deco",
+     "x": 79,
+     "y": 17,
+     "arg": 5
+    },
+    {
+     "kind": "deco",
+     "x": 4,
+     "y": 17,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 13,
+     "y": 13,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 20,
+     "y": 10,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 25,
+     "y": 10,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 32,
+     "y": 14,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 40,
+     "y": 11,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 55,
+     "y": 15,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 61,
+     "y": 12,
+     "arg": 0
+    },
+    {
+     "kind": "deco",
+     "x": 66,
+     "y": 12,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 74,
+     "y": 17,
+     "arg": 0
     }
    ],
    "boss_arena": null,
@@ -337,7 +552,10 @@
    "id": 4,
    "name": "Frozen Castle",
    "theme": "cave",
-   "tile_art": "stone",
+   "tiles": {
+    "top": "S02",
+    "fill": "F03"
+   },
    "style": "column",
    "width": 85,
    "height": 20,
@@ -393,6 +611,11 @@
      "y": 13
     },
     {
+     "kind": "gem",
+     "x": 30,
+     "y": 8
+    },
+    {
      "kind": "pitspikes",
      "x": 24,
      "y": 19
@@ -436,11 +659,6 @@
      "patrol": 5
     },
     {
-     "kind": "gem",
-     "x": 30,
-     "y": 8
-    },
-    {
      "kind": "lamp",
      "x": 53,
      "y": 12
@@ -449,6 +667,84 @@
      "kind": "lamp",
      "x": 84,
      "y": 17
+    },
+    {
+     "kind": "deco",
+     "x": 1,
+     "y": 17,
+     "arg": 1
+    },
+    {
+     "kind": "deco",
+     "x": 79,
+     "y": 17,
+     "arg": 5
+    },
+    {
+     "kind": "deco",
+     "x": 4,
+     "y": 17,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 10,
+     "y": 17,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 18,
+     "y": 14,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 27,
+     "y": 11,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 32,
+     "y": 11,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 40,
+     "y": 15,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 45,
+     "y": 15,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 52,
+     "y": 12,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 62,
+     "y": 15,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 67,
+     "y": 15,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 74,
+     "y": 17,
+     "arg": 4
     }
    ],
    "boss_arena": null,
@@ -468,7 +764,11 @@
    "id": 5,
    "name": "Lava Cavern",
    "theme": "lava",
-   "tile_art": "lava_rock",
+   "tiles": {
+    "top": "F15",
+    "fill": "F26",
+    "pit": "F21"
+   },
    "style": "column",
    "width": 85,
    "height": 20,
@@ -524,6 +824,11 @@
      "y": 14
     },
     {
+     "kind": "gem",
+     "x": 26,
+     "y": 8
+    },
+    {
      "kind": "spikes",
      "x": 35,
      "y": 15
@@ -566,14 +871,69 @@
      "patrol": 4
     },
     {
-     "kind": "gem",
-     "x": 26,
-     "y": 8
-    },
-    {
      "kind": "lamp",
      "x": 84,
      "y": 17
+    },
+    {
+     "kind": "deco",
+     "x": 1,
+     "y": 17,
+     "arg": 1
+    },
+    {
+     "kind": "deco",
+     "x": 79,
+     "y": 17,
+     "arg": 5
+    },
+    {
+     "kind": "deco",
+     "x": 4,
+     "y": 17,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 18,
+     "y": 14,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 25,
+     "y": 11,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 33,
+     "y": 15,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 46,
+     "y": 12,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 53,
+     "y": 16,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 66,
+     "y": 12,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 74,
+     "y": 17,
+     "arg": 6
     }
    ],
    "boss_arena": null,
@@ -593,7 +953,11 @@
    "id": 6,
    "name": "Windy Heights",
    "theme": "snow",
-   "tile_art": "cloud_platform",
+   "tiles": {
+    "top": "S04",
+    "fill": "S02",
+    "oneway": "S04"
+   },
    "style": "float",
    "width": 85,
    "height": 20,
@@ -654,6 +1018,11 @@
      "y": 6
     },
     {
+     "kind": "gem",
+     "x": 28,
+     "y": 5
+    },
+    {
      "kind": "spikes",
      "x": 37,
      "y": 12
@@ -696,9 +1065,9 @@
      "patrol": 4
     },
     {
-     "kind": "gem",
-     "x": 28,
-     "y": 5
+     "kind": "lamp",
+     "x": 84,
+     "y": 14
     }
    ],
    "boss_arena": null,
@@ -719,7 +1088,10 @@
    "id": 7,
    "name": "Ancient Ruins",
    "theme": "forest",
-   "tile_art": "forest_ground",
+   "tiles": {
+    "top": "F01",
+    "fill": "F06"
+   },
    "style": "column",
    "width": 85,
    "height": 20,
@@ -775,6 +1147,11 @@
      "y": 13
     },
     {
+     "kind": "gem",
+     "x": 30,
+     "y": 8
+    },
+    {
      "kind": "ladder",
      "x": 15,
      "y": 14,
@@ -801,11 +1178,6 @@
      "patrol": 4
     },
     {
-     "kind": "gem",
-     "x": 30,
-     "y": 8
-    },
-    {
      "kind": "lamp",
      "x": 64,
      "y": 15
@@ -814,6 +1186,72 @@
      "kind": "lamp",
      "x": 84,
      "y": 17
+    },
+    {
+     "kind": "deco",
+     "x": 1,
+     "y": 17,
+     "arg": 1
+    },
+    {
+     "kind": "deco",
+     "x": 79,
+     "y": 17,
+     "arg": 5
+    },
+    {
+     "kind": "deco",
+     "x": 4,
+     "y": 17,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 10,
+     "y": 17,
+     "arg": 2
+    },
+    {
+     "kind": "deco",
+     "x": 18,
+     "y": 14,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 26,
+     "y": 11,
+     "arg": 2
+    },
+    {
+     "kind": "deco",
+     "x": 32,
+     "y": 11,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 39,
+     "y": 15,
+     "arg": 2
+    },
+    {
+     "kind": "deco",
+     "x": 53,
+     "y": 12,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 61,
+     "y": 15,
+     "arg": 2
+    },
+    {
+     "kind": "deco",
+     "x": 74,
+     "y": 17,
+     "arg": 6
     }
    ],
    "boss_arena": null,
@@ -831,7 +1269,10 @@
    "id": 8,
    "name": "Underground Mine",
    "theme": "cave",
-   "tile_art": "stone",
+   "tiles": {
+    "top": "F08",
+    "fill": "F25"
+   },
    "style": "column",
    "width": 85,
    "height": 20,
@@ -887,6 +1328,11 @@
      "y": 9
     },
     {
+     "kind": "gem",
+     "x": 63,
+     "y": 8
+    },
+    {
      "kind": "spikes",
      "x": 27,
      "y": 16
@@ -923,14 +1369,69 @@
      "patrol": 4
     },
     {
-     "kind": "gem",
-     "x": 63,
-     "y": 8
-    },
-    {
      "kind": "lamp",
      "x": 84,
      "y": 17
+    },
+    {
+     "kind": "deco",
+     "x": 1,
+     "y": 17,
+     "arg": 1
+    },
+    {
+     "kind": "deco",
+     "x": 79,
+     "y": 17,
+     "arg": 5
+    },
+    {
+     "kind": "deco",
+     "x": 4,
+     "y": 17,
+     "arg": 2
+    },
+    {
+     "kind": "deco",
+     "x": 18,
+     "y": 13,
+     "arg": 3
+    },
+    {
+     "kind": "deco",
+     "x": 25,
+     "y": 16,
+     "arg": 2
+    },
+    {
+     "kind": "deco",
+     "x": 39,
+     "y": 12,
+     "arg": 2
+    },
+    {
+     "kind": "deco",
+     "x": 48,
+     "y": 15,
+     "arg": 3
+    },
+    {
+     "kind": "deco",
+     "x": 53,
+     "y": 15,
+     "arg": 2
+    },
+    {
+     "kind": "deco",
+     "x": 60,
+     "y": 11,
+     "arg": 2
+    },
+    {
+     "kind": "deco",
+     "x": 74,
+     "y": 17,
+     "arg": 3
     }
    ],
    "boss_arena": null,
@@ -952,7 +1453,10 @@
    "id": 9,
    "name": "Crystal Peak",
    "theme": "crystal",
-   "tile_art": "ice",
+   "tiles": {
+    "top": "S17",
+    "fill": "S15"
+   },
    "style": "column",
    "width": 85,
    "height": 20,
@@ -1008,6 +1512,11 @@
      "y": 7
     },
     {
+     "kind": "gem",
+     "x": 55,
+     "y": 6
+    },
+    {
      "kind": "spikes",
      "x": 24,
      "y": 11
@@ -1057,14 +1566,75 @@
      "patrol": 5
     },
     {
-     "kind": "gem",
-     "x": 55,
-     "y": 6
-    },
-    {
      "kind": "lamp",
      "x": 84,
      "y": 17
+    },
+    {
+     "kind": "deco",
+     "x": 1,
+     "y": 17,
+     "arg": 1
+    },
+    {
+     "kind": "deco",
+     "x": 79,
+     "y": 17,
+     "arg": 5
+    },
+    {
+     "kind": "deco",
+     "x": 4,
+     "y": 17,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 17,
+     "y": 14,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 25,
+     "y": 11,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 32,
+     "y": 15,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 46,
+     "y": 12,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 53,
+     "y": 9,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 62,
+     "y": 13,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 67,
+     "y": 13,
+     "arg": 4
+    },
+    {
+     "kind": "deco",
+     "x": 74,
+     "y": 17,
+     "arg": 4
     }
    ],
    "boss_arena": null,
@@ -1084,7 +1654,12 @@
    "id": 10,
    "name": "Final Castle",
    "theme": "lava",
-   "tile_art": "lava_rock",
+   "tiles": {
+    "top": "F15",
+    "fill": "F26",
+    "oneway": "F11",
+    "pit": "F21"
+   },
    "style": "column",
    "width": 140,
    "height": 20,
@@ -1140,6 +1715,11 @@
      "y": 12
     },
     {
+     "kind": "gem",
+     "x": 33,
+     "y": 8
+    },
+    {
      "kind": "ladder",
      "x": 17,
      "y": 14,
@@ -1166,14 +1746,105 @@
      "patrol": 4
     },
     {
-     "kind": "gem",
-     "x": 33,
-     "y": 8
-    },
-    {
      "kind": "lamp",
      "x": 75,
      "y": 17
+    },
+    {
+     "kind": "deco",
+     "x": 1,
+     "y": 17,
+     "arg": 1
+    },
+    {
+     "kind": "deco",
+     "x": 4,
+     "y": 17,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 11,
+     "y": 17,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 19,
+     "y": 14,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 24,
+     "y": 14,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 32,
+     "y": 11,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 41,
+     "y": 14,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 46,
+     "y": 14,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 54,
+     "y": 11,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 60,
+     "y": 11,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 67,
+     "y": 14,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 81,
+     "y": 17,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 88,
+     "y": 17,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 95,
+     "y": 17,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 102,
+     "y": 17,
+     "arg": 6
+    },
+    {
+     "kind": "deco",
+     "x": 109,
+     "y": 17,
+     "arg": 6
     }
    ],
    "boss_arena": {
