@@ -1,10 +1,12 @@
 /* RetroBox Originals - Blizzard Buddies: a one-screen snowball platformer for one or two players. An original game:
  * throw snow at the monsters, bury them in snowballs, roll the balls into the rest. Logic runs on a 32 x 18 tile board at
  * 60 Hz; drawing is resolution independent (a tile is height / 18 pixels, so 960x540, 1280x720 and 1920x1080 all fill the
- * screen exactly). Every picture is drawn in code. */
+ * screen exactly). The buddies and the five small monsters are sprites (sprite.c, art in assets/); the scenery, the
+ * snowballs, the ghost and the bosses are drawn in code, and so are the characters if the sprites cannot be set up. */
 #include "game.h"
 #include "gfx.h"
 #include "snd.h"
+#include "sprite.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -944,8 +946,9 @@ static void render_bg(int level) {
     bgLevel = level; bgTitle = st.screen == S_TITLE;
 }
 
-/* A buddy (penguin with a scarf and a beanie). (fx, fy) = centre of the feet in pixels, uu = one tile in pixels. */
-static void draw_buddy(int skin, float fx, float fy, float uu, int dir, int anim, int moving, int air, float vy, int throwing, int dying, int land) {
+/* A buddy drawn in code (penguin with a scarf and a beanie): the fallback when there are no sprites.
+ * (fx, fy) = centre of the feet in pixels, uu = one tile in pixels. */
+static void draw_buddy_code(int skin, float fx, float fy, float uu, int dir, int anim, int moving, int air, float vy, int throwing, int dying, int land) {
     const Skin *k = &SKINS[((skin % NSKINS) + NSKINS) % NSKINS];
     float f = (float)dir;
     float run = (moving && !air) ? sinf((float)anim * .4f) : 0.f;
@@ -983,6 +986,24 @@ static void draw_buddy(int skin, float fx, float fy, float uu, int dir, int anim
     else gfx_circle(&fb, fx + f * .46f * uu, mid - swing, .13f * uu, k->dark, 255);
 }
 
+/* A buddy. throwT counts down from 10 after a throw, deadT counts up from 1 after a hit (0 = alive). */
+static void draw_buddy(int skin, float fx, float fy, float uu, int dir, int anim, int moving, int air, float vy, int throwT, int deadT, int land) {
+    if (!spr_ready()) {
+        draw_buddy_code(skin, fx, fy, uu, deadT ? ((deadT / 6) & 1 ? 1 : -1) : dir, anim, moving, air, vy, throwT > 0, deadT > 0, land);
+        return;
+    }
+    int fr;
+    float sx = 1.f, sy = 1.f;
+    if (deadT) fr = deadT < 24 ? spr_frame(SPR_BUDDY_HIT, deadT / 8, 0) : spr_frame(SPR_BUDDY_DEATH, (deadT - 24) / 7, 0);
+    else if (throwT > 0) fr = spr_frame(SPR_BUDDY_ATTACK, (10 - throwT) * 4 / 10, 0);
+    else if (air) fr = spr_frame(SPR_BUDDY_JUMP, vy < -.3f ? 0 : (vy < -.05f ? 1 : (vy < .15f ? 2 : 3)), 0);
+    else if (moving) fr = spr_frame(SPR_BUDDY_RUN, anim / 5, 1);
+    else fr = spr_frame(SPR_BUDDY_IDLE, anim / 10, 1);
+    if (!deadT && land > 0) { sy = 1.f - .12f * (float)land / 7.f; sx = 1.f + .08f * (float)land / 7.f; }   /* squash on landing */
+    SprDraw d = {uu, sx, sy, 0.f, dir < 0, skin, 255, 0};
+    spr_draw(&fb, fr, fx, fy, &d);
+}
+
 static void snow_cap(float px, float top, float uu, int layers) {
     uint32_t w = RGB(250, 253, 255);
     float r = (.16f + .1f * (float)layers) * uu;
@@ -1007,6 +1028,74 @@ static void draw_ball(const Enemy *e, float px, float py, float uu) {
     }
 }
 
+/* The five small monsters as sprites. Poses the art does not have are built from the ones it has: the yeti's walk and
+ * charge are its idle frames with a bob or a forward lean (its run frames stand in a painted snow cloud). Returns 0 for
+ * the ghost and the bosses (drawn in code) or without sprites. */
+static int draw_enemy_sprite(const Enemy *e, float px, float py, float uu) {
+    if (!spr_ready() || e->type == E_GHOST || e->type == E_BOSS) return 0;
+    int dying = e->state == ES_DYING, t = e->anim;
+    int hit = e->hitFlash > 0 && !dying, hitI = (7 - e->hitFlash) * 3 / 7;
+    SprDraw d = {uu, 1.f, 1.f, 0.f, e->dir < 0, 0, 255, e->hitFlash > 4 && !dying ? 170 : 0};
+    if (dying && e->timer > 40) d.alpha = (50 - e->timer) * 25;
+    float ax = px, ay = py;
+    int fr;
+    float vy = e->vy;
+    int jumpI = vy < -.3f ? 0 : (vy < 0.f ? 1 : (vy < .2f ? 2 : 3));
+    switch (e->type) {
+    case E_WALK:
+        if (dying) fr = spr_frame(SPR_WALKER_DEATH, e->timer / 7, 0);
+        else if (hit) fr = spr_frame(SPR_WALKER_HIT, hitI, 0);
+        else if (!e->ground) fr = spr_frame(SPR_WALKER_JUMP, jumpI, 0);
+        else fr = spr_frame(SPR_WALKER_RUN, t / (7 + 3 * e->snow), 1);
+        break;
+    case E_HOP:
+        if (dying) fr = spr_frame(SPR_HOPPER_DEATH, e->timer / 8, 0);
+        else if (hit) fr = spr_frame(SPR_HOPPER_HIT, hitI, 0);
+        else if (!e->ground) fr = spr_frame(SPR_HOPPER_JUMP, jumpI, 0);
+        else fr = spr_frame(SPR_HOPPER_IDLE, t / 9, 1);
+        break;
+    case E_FLY:
+        ay = py - .42f * uu;                                     /* the flyer is anchored at its body centre */
+        if (dying) fr = spr_frame(SPR_FLYER_DEATH, e->timer / 8, 0);
+        else if (hit) fr = spr_frame(SPR_FLYER_HIT, hitI, 0);
+        else fr = spr_frame(SPR_FLYER_FLY, t / (5 + 2 * e->snow), 1);
+        break;
+    case E_SHOOT:
+        if (dying) fr = spr_frame(SPR_SPITTER_DEATH, e->timer / 8, 0);
+        else if (hit) fr = spr_frame(SPR_SPITTER_HIT, hitI, 0);
+        else if (e->cd < 22 && e->cd > 0 && e->snow == 0) fr = spr_frame(SPR_SPITTER_ATTACK, (22 - e->cd) * 3 / 22, 0);
+        else if (!e->ground) fr = spr_frame(SPR_SPITTER_WALK, 0, 0);
+        else fr = spr_frame(SPR_SPITTER_WALK, t / (8 + 3 * e->snow), 1);
+        break;
+    case E_CHARGE: {
+        int charging = e->cd > 0, stunned = e->timer > 0;
+        if (dying) fr = spr_frame(SPR_CHARGER_DEATH, e->timer / 8, 0);
+        else if (hit) fr = spr_frame(SPR_CHARGER_HIT, 0, 0);
+        else if (stunned) fr = spr_frame(SPR_CHARGER_HIT, 2, 0);
+        else if (charging) {
+            fr = spr_frame(SPR_CHARGER_IDLE, t / 3, 1);
+            d.lean = .22f;
+            ax += sinf((float)t * 1.6f) * .03f * uu;
+            ay -= fabs_(sinf((float)t * .5f)) * .06f * uu;
+            for (int k = 1; k <= 3; k++) gfx_circle(&fb, px - (float)e->dir * (.5f + (float)k * .25f) * uu, py - .12f * uu, (.1f + (float)k * .03f) * uu, RGB(235, 244, 255), 150 - k * 35);
+        } else {
+            fr = spr_frame(SPR_CHARGER_IDLE, t / 8, 1);
+            if (e->ground) ay -= fabs_(sinf((float)t * .2f)) * .05f * uu;     /* a heavy waddle */
+        }
+        break; }
+    default: return 0;
+    }
+    spr_draw(&fb, fr, ax, ay, &d);
+    if (dying) return 1;
+    float top = ay - spr_top(fr) * uu;
+    if (e->type == E_SHOOT && e->cd < 22 && e->cd > 0 && e->snow == 0)                      /* about to spit */
+        gfx_circle(&fb, px + (float)e->dir * .5f * uu, py - .45f * uu, .13f * uu * (1.f + (float)(22 - e->cd) * .03f), RGB(255, 140, 40), 220);
+    if (e->type == E_CHARGE && e->timer > 0)
+        for (int k = 0; k < 3; k++) { float a = (float)e->anim * .2f + (float)k * 2.09f; gfx_circle(&fb, px + cosf(a) * .4f * uu, top - .1f * uu + sinf(a) * .1f * uu, .07f * uu, C_GOLD, 255); }
+    if (e->snow > 0) snow_cap(px, top + .1f * uu, uu, e->snow);
+    return 1;
+}
+
 static void draw_enemy(const Enemy *e) {
     float uu = (float)cell;
     float px = PX(e->x), py = PY(e->y);
@@ -1015,6 +1104,7 @@ static void draw_enemy(const Enemy *e) {
         draw_ball(e, px, py, uu);
         return;
     }
+    if (draw_enemy_sprite(e, px, py, uu)) return;
     int dying = e->state == ES_DYING;
     float spin = dying ? sinf((float)e->timer * .5f) : 1.f;      /* squash left-right = a cheap spin */
     uint32_t flash = RGB(255, 255, 255);
@@ -1275,8 +1365,9 @@ static void draw_title(void) {
     }
     shadow_text(cxp, u(78) + 7.f * (float)ls + u(14), fs(9), "BUDDIES", C_GOLD);
     float floorY = PY((float)(TH - 1));
-    draw_buddy(st.skin[0], cxp - u(330), floorY, u(110), 1, st.frame, 0, 0, 0, (st.frame / 50) & 1, 0, 0);
-    draw_buddy(st.skin[1], cxp + u(330), floorY, u(110), -1, st.frame, 0, 0, 0, ((st.frame + 25) / 50) & 1, 0, 0);
+    int t0 = st.frame % 100, t1 = (st.frame + 50) % 100;                     /* a throw every 100 frames each */
+    draw_buddy(st.skin[0], cxp - u(330), floorY, u(110), 1, st.frame, 0, 0, 0, t0 < 10 ? 10 - t0 : 0, 0, 0);
+    draw_buddy(st.skin[1], cxp + u(330), floorY, u(110), -1, st.frame, 0, 0, 0, t1 < 10 ? 10 - t1 : 0, 0, 0);
     for (int row = 0; row < 2; row++) {
         float y = u(268) + (float)row * u(56);
         int sel = st.menuRow == row;
@@ -1376,6 +1467,46 @@ static void blit_bg(int dx, int dy) {
         memcpy(fb.px + (size_t)y * fb.w + (dx > 0 ? dx : 0), bg + (size_t)(y - dy) * fb.w + (dx < 0 ? -dx : 0), (size_t)n * sizeof(uint16_t));
 }
 
+#ifdef RB_SPRITE_GALLERY
+/* Test builds: every sprite frame of every character at play size, one row per character (the buddy in all skins),
+ * plus each animation playing, for checking the art at each resolution with tools/core-harness. */
+static void draw_gallery(void) {
+    static const char *const NAMES[SPR_NCHARS] = {"BUDDY", "WALKER", "HOPPER", "FLYER", "SPITTER", "CHARGER"};
+    float uu = (float)cell, y = 1.6f * uu;
+    gfx_text(&fb, u(8), u(6), fs(2), "SPRITE GALLERY", C_GOLD, 255);
+    for (int c = 0; c < SPR_NCHARS; c++) {
+        const SprCharDef *cd = &SPR_CHARS[c];
+        float x = 3.2f * uu, ay = c == SPR_FLYER ? y - .45f * uu : y;
+        gfx_text(&fb, u(8), y - uu * .6f, fs(1.6f), NAMES[c], C_TEXT, 255);
+        for (int f = 0; f < cd->count; f++) {
+            int fr = cd->first + f;
+            SprDraw d = {uu, 1.f, 1.f, 0.f, 0, 0, 255, 0};
+            spr_draw(&fb, fr, x + SPR_FRAMES[fr].ax / (float)SPR_PPT * uu, ay, &d);
+            x += (float)SPR_FRAMES[fr].w / (float)SPR_PPT * uu + .12f * uu;
+        }
+        y += 1.45f * uu;
+    }
+    float x = 3.2f * uu;
+    gfx_text(&fb, u(8), y - uu * .6f, fs(1.6f), "SKINS", C_TEXT, 255);
+    for (int k = 0; k < SPR_CHARS[SPR_BUDDY].npal; k++) {          /* the buddy skins, facing both ways */
+        SprDraw d = {uu, 1.f, 1.f, 0.f, k & 1, k, 255, 0};
+        spr_draw(&fb, spr_frame(SPR_BUDDY_IDLE, st.frame / 10, 1), x + .5f * uu, y, &d);
+        x += 1.4f * uu;
+    }
+    y += 1.45f * uu;
+    /* every animation playing, the way the game times them */
+    x = 3.2f * uu;
+    for (int a = 0; a < SPR_NANIMS; a++) {
+        int fps = SPR_ANIMS[a].fps ? SPR_ANIMS[a].fps : 8;
+        int fr = spr_frame(a, st.frame * fps / 60, 1);
+        SprDraw d = {uu, 1.f, 1.f, 0.f, 0, 0, 255, 0};
+        spr_draw(&fb, fr, x, y + (a >= SPR_FLYER_IDLE && a <= SPR_FLYER_DEATH ? -.45f * uu : 0.f), &d);
+        x += 1.3f * uu;
+        if (x > (float)W - uu) { x = 3.2f * uu; y += 1.45f * uu; }
+    }
+}
+#endif
+
 static void draw(void) {
     if (bgLevel != st.level || bgTitle != (st.screen == S_TITLE)) render_bg(st.level);
     shx = shy = 0.f;
@@ -1395,8 +1526,7 @@ static void draw(void) {
             const Player *p = &st.pl[i];
             if (!p->active || p->dead >= 5000) continue;
             if (p->invuln > 0 && !p->dead && ((p->invuln / 4) & 1)) continue;
-            int d = p->dead > 0;
-            draw_buddy(st.skin[i], PX(p->x), PY(p->y), uu, d ? ((p->dead / 6) & 1 ? 1 : -1) : p->dir, p->anim, fabs_(p->vx) > .03f, !p->ground, p->vy, p->throwAnim > 0, d, p->land);
+            draw_buddy(st.skin[i], PX(p->x), PY(p->y), uu, p->dir, p->anim, fabs_(p->vx) > .03f, !p->ground, p->vy, p->throwAnim, p->dead, p->land);
         }
     for (int i = 0; i < MAXPT; i++) {
         const Part *q = &st.pt[i];
@@ -1413,6 +1543,9 @@ static void draw(void) {
         gfx_text_c(&fb, PX(p->x) + u(2), y + u(2), fs(2.2f), b, RGB(0, 0, 0), p->life > 14 ? 140 : p->life * 10);
         gfx_text_c(&fb, PX(p->x), y, fs(2.2f), b, p->value >= 1000 ? C_GOLD : C_TEXT, p->life > 14 ? 255 : p->life * 18);
     }
+#ifdef RB_SPRITE_GALLERY
+    if (st.screen == S_TITLE) { dim(150); draw_gallery(); return; }
+#endif
     if (st.screen == S_TITLE) { draw_title(); return; }
     draw_hud();
     if (st.screen == S_PLAY) draw_banner();
@@ -1421,7 +1554,7 @@ static void draw(void) {
 }
 
 /* ---- public ---- */
-static void bz_release(void) { free(fb.px); free(bg); fb.px = NULL; bg = NULL; bgLevel = -1; }
+static void bz_release(void) { free(fb.px); free(bg); fb.px = NULL; bg = NULL; bgLevel = -1; spr_release(); }
 
 static int bz_setup(int w, int h) {
     bz_release();
@@ -1435,6 +1568,7 @@ static int bz_setup(int w, int h) {
     cell = h / TH; if (cell < 8) cell = 8;
     ox = (w - TW * cell) / 2;
     bgLevel = -1; bgTitle = -1;
+    spr_setup(cell);                                       /* without memory for them the characters are drawn in code */
     return 1;
 }
 

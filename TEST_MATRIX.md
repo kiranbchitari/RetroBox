@@ -261,3 +261,17 @@ New original game in the same core (`cores/originals/blizzard.c`, about 1100 lin
 ### Blizzard Buddies, second pass after "not interesting" (2026-10-17, emulator)
 
 The user found the first version boring (too slow and easy, always the same, no reason to continue, floaty). Changes: faster monsters with more and faster spawns (up to 14 per level), a ghost after 45 s; three new monsters (spitter, charger, ghost) and two more bosses (frost wizard, rage ogre); ten layouts with slippery ice; combo multiplier, time and no-miss bonuses, extra lives, three difficulties, six buddies (three unlocked by reaching levels 5, 10, 15); snappier jumping (rise gravity .034, fall .045), hit-stop, camera shake, knockback, dust and landing squash. Looked at in the Mac harness (title with the new menu, level 8 with every monster type and ice platforms, wizard and rage ogre bosses), a bot ran 60000 frames without a crash, and one more on-device test (menu choices survive a reload) passes: device 40, JVM 218. **Not verified:** that it is actually more fun (that needs a person), the difficulty curve past level 2, the unlock flow (needs reaching level 5), co-op balance, the TV (the TV was unreachable when I tried to install this build: ping and port 5555 failed).
+
+### Blizzard Buddies character sprites (2026-10-18, host harness only)
+
+The buddy and the five small monsters now use a supplied, generated character art pack instead of shapes drawn in code
+(`cores/originals/assets`, `sprite.c`, `tools/originals-sprites/build_sprites.py`; physics, hit boxes and controls
+unchanged). Checked in the Linux harness: every frame, skin and animation in a `-DRB_SPRITE_GALLERY` build at 720p and
+1080p (frames dumped and looked at, zoomed to the pixel: clean outlines, no labels, stars, haze or coloured halo); the
+title, HUD and play at 720p and 1080p; a `-DRB_SELFTEST -DRB_START_LEVEL=7` bot game to Game Over with all five monster
+types, snowballs, stunned yetis, snow caps and a player death (hit then knocked-out poses). Gameplay, gallery and title
+builds at 540p, 720p and 1080p under AddressSanitizer + UndefinedBehaviorSanitizer: no reports. Cost on this machine:
+frame time about 5% higher than the code-drawn version (1080p 113 vs 120 frames/s), sprite setup 12-30 ms per load.
+clang -Wall -Wextra clean. **Not verified:** the Android build (no NDK in this environment; `build-android.sh` now also
+compiles `sprite.c`), the emulator device tests, the Mi TV (speed on its 32-bit CPU, setup time, memory: decoded sprites take about
+3.8 MB at 720p and 5.8 MB at 1080p), and whether the art reads well on a TV from a sofa. The bosses are still drawn in code.

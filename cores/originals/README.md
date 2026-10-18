@@ -22,10 +22,13 @@ ratios. Logic runs on a fixed grid at 60 Hz independent of the resolution.
 |---|---|
 | `core.c` | libretro glue: options, input (D-pad, left stick, A/B/Start), audio batch, save RAM (best scores, last menu choice), save states |
 | `blizzard.c` | Blizzard Buddies, a one-screen snowball platformer for one or two players (see below) |
+| `sprite.c` | Blizzard's character sprites: decodes `sprites_data.h` once per picture size, pre-scales every frame to the game tile with an area filter, alpha blit with mirroring, squash/stretch, lean and a white hit flash |
+| `sprites_data.h` | generated, do not edit: the character frames as 255-colour palettes + run-length coded pixels, six palette-swapped buddy skins (about 400 KB of pixel data) |
+| `assets/` | `src/`: the character art pack as supplied (strips and its README); `blizzard_atlas.png` + `blizzard_atlas.json`: the cleaned frames, anchors and animations made from it |
 | `snake.c` | the game: grid logic, smooth sliding snake, wrap/walls, bonus fruit, title screen with an autopilot snake, pause, game over, particles |
 | `gfx.c` | software renderer: anti-aliased rounded rectangles / circles / rings, dithered gradient, vignette, 5x7 pixel font |
 | `snd.c` | sound effects and a small looping chiptune, all synthesised in code (square / triangle / noise voices with pitch slides); no audio files |
-| `build-host.sh` | builds a macOS/Linux library for `tools/core-harness` (`EXTRA_CFLAGS=-DRB_SELFTEST` makes the autopilot / a test bot play real games; Blizzard also knows `-DRB_GODMODE`, `-DRB_TRACE` and `-DRB_START_LEVEL=5`) |
+| `build-host.sh` | builds a macOS/Linux library for `tools/core-harness` (`EXTRA_CFLAGS=-DRB_SELFTEST` makes the autopilot / a test bot play real games; Blizzard also knows `-DRB_GODMODE`, `-DRB_TRACE`, `-DRB_START_LEVEL=5` and `-DRB_SPRITE_GALLERY`, which shows every sprite frame, skin and animation instead of the title) |
 | `build-android.sh` | builds both Android ABIs into `app/src/main/jniLibs` (also run by `cores/build-cores.sh`) |
 
 ## Trying it without a TV
@@ -47,7 +50,9 @@ fruit appears after every 5th apple. Best scores are kept per mode and speed in 
 
 ## Blizzard Buddies
 
-An original game (own name, characters, levels and pictures; nothing taken from any other game). Throw snow (A) at the monsters:
+An original game (own name, characters and levels; nothing taken from any other game). The buddy and the five small
+monsters are sprites from a generated character art pack made for the game (`assets/src`); the scenery, snowballs, ghost
+and bosses are drawn in code. Throw snow (A) at the monsters:
 three hits bury one in a snowball, walk into the ball to roll it, and it flattens every monster in its way. Move with the D-pad or
 stick, jump with B or Up, drop through a platform with Down + jump. Pad 2's Start joins a second player at any time (Start on pad 2
 at the title starts a co-op game). Best total score and menu choices are kept in the cartridge save.
@@ -63,6 +68,26 @@ at the title starts a co-op game). Best total score and menu choices are kept in
 * **Feel:** hit-stop and camera shake on hits, knockback, dust, squash on landing, short jumps by letting go of B, a little music.
 
 It is drawn on a 32 x 18 tile board (a tile is height / 18 pixels, so 960x540, 1280x720 and 1920x1080 are filled exactly), at 60 Hz.
+
+### Character sprites
+
+`tools/originals-sprites/build_sprites.py` (Python 3 with Pillow and numpy) turns the strips in `assets/src` into
+`assets/blizzard_atlas.png`, `assets/blizzard_atlas.json` and `sprites_data.h`; rerun it after changing the art or its
+frame lists (`--preview sheet.png` also writes every animation on one sheet). The strips are not a grid, so the script:
+cleans the alpha haze around the art, finds each body and splits touching ones at the thinnest column, drops labels, stars,
+projectiles and other loose effects, erases the few effects attached to a body, recolours the anti-aliased edge so no
+coloured glow shows, scales each character once to 64 pixels per tile and anchors all its frames at the feet (the flyer at
+its body centre). Frames whose effects are painted over the body are left out (listed per character in the JSON's
+`omitted`): the walker's slash and smoke frames, the hopper's attack, the spitter's spat balls and a glitchy hit pose,
+and the yeti's run and charge, which stand in a snow cloud. The game makes the yeti's walk and charge from its idle frames
+(a waddle, a forward lean, and the dust puffs drawn in code). The frame lists refer to bodies by their order in the strip;
+the script stops if a strip yields a different number of bodies, so a change to the art cannot silently shift them.
+
+In the game: idle / run / jump (picked by vertical speed) / throw / hit then death for the buddies; walk, jump, hit and
+death for the walker; crouch (idle), jump, hit, death for the hopper; fly, hit, death for the flyer; walk, spit wind-up
+(attack), hit, death for the spitter; idle-based walk and charge, a dizzy pose when stunned, hit and death for the yeti.
+Positions, speeds and hit boxes are unchanged; only the drawing is new. If the sprites cannot be set up (no memory) the
+characters are drawn in code as before.
 
 ## Adding another game
 
