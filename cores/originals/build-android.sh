@@ -15,7 +15,7 @@ for pair in armeabi-v7a:armv7a-linux-androideabi arm64-v8a:aarch64-linux-android
   out="$JNILIBS/$abi/libretrobox_originals_libretro_android.so"
   "$BIN/${triple}${API}-clang" -O2 -fPIC -shared -std=gnu11 -Wall -Wextra -fvisibility=hidden \
     -I"$HERE/../../app/src/main/cpp/third_party/libretro" -Wl,-z,max-page-size=16384 -Wl,--build-id=none \
-    -o "$out" "$HERE"/core.c "$HERE"/gfx.c "$HERE"/snd.c "$HERE"/snake.c "$HERE"/blizzard.c "$HERE"/sprite.c "$HERE"/levels.c -lm
+    -o "$out" "$HERE"/core.c "$HERE"/gfx.c "$HERE"/snd.c "$HERE"/snake.c "$HERE"/blizzard.c "$HERE"/sprite.c "$HERE"/levels.c "$HERE"/stagegen.c -lm
   "$BIN/llvm-strip" --strip-unneeded "$out"
   echo "built $out ($(wc -c < "$out") bytes)"
 done

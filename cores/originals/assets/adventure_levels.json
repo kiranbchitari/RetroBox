@@ -64,18 +64,6 @@
      "y": 7
     },
     {
-     "kind": "ladder",
-     "x": 18,
-     "y": 13,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 51,
-     "y": 11,
-     "arg": 3
-    },
-    {
      "kind": "enemy",
      "x": 19,
      "y": 13,
@@ -247,18 +235,6 @@
      "y": 15
     },
     {
-     "kind": "ladder",
-     "x": 12,
-     "y": 13,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 41,
-     "y": 15,
-     "arg": 3
-    },
-    {
      "kind": "enemy",
      "x": 13,
      "y": 13,
@@ -421,24 +397,6 @@
      "kind": "gem",
      "x": 23,
      "y": 7
-    },
-    {
-     "kind": "ladder",
-     "x": 11,
-     "y": 13,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 39,
-     "y": 11,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 71,
-     "y": 17,
-     "arg": 3
     },
     {
      "kind": "enemy",
@@ -624,18 +582,6 @@
      "kind": "pitspikes",
      "x": 47,
      "y": 19
-    },
-    {
-     "kind": "ladder",
-     "x": 15,
-     "y": 14,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 50,
-     "y": 12,
-     "arg": 3
     },
     {
      "kind": "enemy",
@@ -839,24 +785,6 @@
      "y": 19
     },
     {
-     "kind": "ladder",
-     "x": 14,
-     "y": 14,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 42,
-     "y": 12,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 71,
-     "y": 17,
-     "arg": 3
-    },
-    {
      "kind": "enemy",
      "x": 15,
      "y": 14,
@@ -1033,24 +961,6 @@
      "y": 11
     },
     {
-     "kind": "ladder",
-     "x": 10,
-     "y": 14,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 35,
-     "y": 12,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 64,
-     "y": 8,
-     "arg": 3
-    },
-    {
      "kind": "enemy",
      "x": 11,
      "y": 14,
@@ -1152,18 +1062,6 @@
      "y": 8
     },
     {
-     "kind": "ladder",
-     "x": 15,
-     "y": 14,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 49,
-     "y": 12,
-     "arg": 3
-    },
-    {
      "kind": "enemy",
      "x": 16,
      "y": 14,
@@ -1207,21 +1105,9 @@
     },
     {
      "kind": "deco",
-     "x": 10,
-     "y": 17,
-     "arg": 2
-    },
-    {
-     "kind": "deco",
      "x": 18,
      "y": 14,
      "arg": 6
-    },
-    {
-     "kind": "deco",
-     "x": 26,
-     "y": 11,
-     "arg": 2
     },
     {
      "kind": "deco",
@@ -1231,21 +1117,9 @@
     },
     {
      "kind": "deco",
-     "x": 39,
-     "y": 15,
-     "arg": 2
-    },
-    {
-     "kind": "deco",
      "x": 53,
      "y": 12,
      "arg": 6
-    },
-    {
-     "kind": "deco",
-     "x": 61,
-     "y": 15,
-     "arg": 2
     },
     {
      "kind": "deco",
@@ -1343,18 +1217,6 @@
      "y": 15
     },
     {
-     "kind": "ladder",
-     "x": 13,
-     "y": 13,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 47,
-     "y": 15,
-     "arg": 3
-    },
-    {
      "kind": "enemy",
      "x": 14,
      "y": 13,
@@ -1384,54 +1246,6 @@
      "x": 79,
      "y": 17,
      "arg": 5
-    },
-    {
-     "kind": "deco",
-     "x": 4,
-     "y": 17,
-     "arg": 2
-    },
-    {
-     "kind": "deco",
-     "x": 18,
-     "y": 13,
-     "arg": 3
-    },
-    {
-     "kind": "deco",
-     "x": 25,
-     "y": 16,
-     "arg": 2
-    },
-    {
-     "kind": "deco",
-     "x": 39,
-     "y": 12,
-     "arg": 2
-    },
-    {
-     "kind": "deco",
-     "x": 48,
-     "y": 15,
-     "arg": 3
-    },
-    {
-     "kind": "deco",
-     "x": 53,
-     "y": 15,
-     "arg": 2
-    },
-    {
-     "kind": "deco",
-     "x": 60,
-     "y": 11,
-     "arg": 2
-    },
-    {
-     "kind": "deco",
-     "x": 74,
-     "y": 17,
-     "arg": 3
     }
    ],
    "boss_arena": null,
@@ -1525,24 +1339,6 @@
      "kind": "spikes",
      "x": 45,
      "y": 12
-    },
-    {
-     "kind": "ladder",
-     "x": 12,
-     "y": 14,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 42,
-     "y": 12,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 72,
-     "y": 17,
-     "arg": 3
     },
     {
      "kind": "enemy",
@@ -1718,18 +1514,6 @@
      "kind": "gem",
      "x": 33,
      "y": 8
-    },
-    {
-     "kind": "ladder",
-     "x": 17,
-     "y": 14,
-     "arg": 3
-    },
-    {
-     "kind": "ladder",
-     "x": 53,
-     "y": 11,
-     "arg": 3
     },
     {
      "kind": "enemy",

@@ -23,16 +23,17 @@ ratios. Logic runs on a fixed grid at 60 Hz independent of the resolution.
 | `core.c` | libretro glue: options, input (D-pad, left stick, A/B/Start), audio batch, save RAM (best scores, last menu choice), save states |
 | `blizzard.c` | Blizzard Buddies, a one-screen snowball platformer for one or two players (see below) |
 | `levels.c` | Adventure mode's tiles and painted backgrounds: the rich pack's 64 px tiles scaled once to the game tile (area filter), each stage's background decoded from JPEG (stb_image) when the stage starts, scaled 8% taller than the screen with a dithered bilinear filter and slid across that margin as the camera moves |
-| `levels_data.h` | generated, do not edit: the ten Adventure stages (tile rows, things, scenery, the tiles each stage uses, start / checkpoint / exit / boss arena) and 17 tiles (about 1 MB of source) |
+| `levels_data.h` | generated, do not edit: the art side of the ten Adventure stages (names, which tiles each one uses) and the 17 tiles (about 1 MB of source); the stage layouts in it are no longer used, `stagegen.c` builds them |
 | `backgrounds_data.h` | generated, do not edit: the ten painted stage backgrounds, 1280 x 714 JPEG, 1.85 MB in all |
 | `third_party/stb_image.h` | stb_image v2.30 (MIT / public domain, nothings/stb commit f58f558), only its JPEG decoder is compiled |
+| `stagegen.c` / `stagegen.h` | the stage generator: Arena boards and Adventure stages from a seed (see Generated stages below); pure C, shares the jump physics numbers (`PH_*`) with `update_player` |
 | `sprite.c` | Blizzard's character sprites: decodes `sprites_data.h` once per picture size, pre-scales every frame to the game tile with an area filter, alpha blit with mirroring, squash/stretch, lean and a white hit flash |
 | `sprites_data.h` | generated, do not edit: the character, boss, effect and prop frames as 255-colour palettes + run-length coded pixels, six palette-swapped buddy skins (about 715 KB of pixel data) |
 | `assets/` | `src/rich/` (git-ignored, fetched by `tools/originals-assets/fetch_rich_pack.sh`): the rich art pack all the art now comes from; `src/levels/`: the level pack whose ten layouts the stages are converted from; `src/` and `src/bosses/`: the first character and boss packs, kept for reference; `blizzard_atlas.png` + `blizzard_atlas.json`: the cleaned frames, anchors and animations; `adventure_levels.json`: the converted stages |
 | `snake.c` | the game: grid logic, smooth sliding snake, wrap/walls, bonus fruit, title screen with an autopilot snake, pause, game over, particles |
 | `gfx.c` | software renderer: anti-aliased rounded rectangles / circles / rings, dithered gradient, vignette, 5x7 pixel font |
 | `snd.c` | sound effects and a small looping chiptune, all synthesised in code (square / triangle / noise voices with pitch slides); no audio files |
-| `build-host.sh` | builds a macOS/Linux library for `tools/core-harness` (`EXTRA_CFLAGS=-DRB_SELFTEST` makes the autopilot / a test bot play real games; Blizzard also knows `-DRB_GODMODE`, `-DRB_TRACE`, `-DRB_START_LEVEL=5`, `-DRB_START_STAGE=3` with `-DRB_ROUTE_BOT` for Adventure, and `-DRB_SPRITE_GALLERY`, which shows every sprite frame, skin and animation instead of the title) |
+| `build-host.sh` | builds a macOS/Linux library for `tools/core-harness` (`EXTRA_CFLAGS=-DRB_SELFTEST` makes the autopilot / a test bot play real games; Blizzard also knows `-DRB_GODMODE`, `-DRB_TRACE`, `-DRB_SEED=n` (a fixed seed), `-DRB_START_LEVEL=5` (Arena), `-DRB_START_STAGE=3` and `-DRB_START_X=60` (Adventure: begin at that column), and `-DRB_SPRITE_GALLERY`, which shows every sprite frame, skin and animation instead of the title) |
 | `build-android.sh` | builds both Android ABIs into `app/src/main/jniLibs` (also run by `cores/build-cores.sh`) |
 
 ## Trying it without a TV
@@ -66,7 +67,7 @@ at the title starts a co-op game). Best total score and menu choices are kept in
 * **Pace:** levels get more and faster monsters (up to 14); after 45 seconds a ghost that can't be hurt hunts the players down.
 * **Score:** kills in quick succession build a combo (x2 to x5), rolling one ball through several monsters doubles each kill, a level
   ends with a time bonus and a no-miss bonus, and every 40000 points after 30000 is an extra life. Potions give speed, range and power.
-* **Levels:** ten layouts (some with slippery ice platforms or an ice floor), four colour worlds, every layout drawn in code.
+* **Levels:** every Arena board is generated from the run's seed (see Generated stages): two to four tiers of ledges of different lengths and kinds, sometimes an ice floor, wind, crumbling ledges, a swarm or elite monsters; every fifth level is a boss board. Four colour worlds, drawn in code.
 * **Replay:** difficulty (Easy / Normal / Hard changes monster speed and lives) and six buddy colours; gold, violet and panda unlock
   at levels 5, 10 and 15.
 * **Feel:** hit-stop and camera shake on hits, knockback, dust, squash on landing, short jumps by letting go of B, a little music.
@@ -102,32 +103,56 @@ save states still restore the exact picture. The health bars and the wizard's au
 
 If the sprites cannot be set up (no memory) the characters are drawn in code as before.
 
-### Adventure mode (the level pack)
+### Adventure mode (generated stages)
 
-The title's MODE row picks ARENA (the one-screen game above, unchanged) or ADVENTURE: ten side-scrolling stages made from
-the supplied level pack's ten JSON layouts (`assets/src/levels`), drawn with the rich pack's art. The
-pack's JSON is not the game's format and is not read at run time: `tools/originals-levels/convert_levels.py` converts it
-into the same tile kinds the arena uses (solid, one-way, ice, plus crates) on boards up to 140 x 20 tiles, writes
-`levels_data.h` and `assets/adventure_levels.json` (the converted levels with every fix and check), and stops if any
-check fails. The camera shows 32 x 18 game tiles, follows the players (both stay on
-screen in co-op), moves in whole pixels so tiles never seam, and stops at the world's edges.
+The title's MODE row picks ARENA (the one-screen game above) or ADVENTURE: ten side-scrolling stages drawn with the rich
+pack's art. The stage numbers keep their look (snowy forest, ice cave, mountain cliffs, frozen castle, lava cavern, windy
+heights, ancient ruins, underground mine, crystal peak, the final castle: painted background, tiles, name) but **the layout of
+every stage is generated when a run starts**, so no two runs play alike. The camera shows 32 x 18 game tiles, follows the
+players (both stay on screen in co-op), moves in whole pixels so tiles never seam, and stops at the world's edges.
 
-Physics, hit boxes and controls are the arena's. New in Adventure: pits (falling in costs a life), spikes, springs, coins
-(100) and gems (1000), a checkpoint flag (passing it moves the respawn there), the exit door, the pack's time limit per
-stage (then the hurry-up ghost), monsters placed by the pack that patrol their stretch and sleep off screen, and the
-final stage's boss arena. Arena levels and Adventure stages share the state, save states and save RAM (which remembers
-the mode and the best stage reached).
+Physics, hit boxes and controls are the arena's. In Adventure: pits (falling in costs a life), spikes, springs, coins (100), gems
+(1000), a treasure chest (500) hidden in a nook, a checkpoint flag (passing it moves the respawn there; dying there brings the monsters
+beyond it back), the exit door, a time limit per stage (then the hurry-up ghost), monsters that wake as the camera nears them, and the
+final stage's boss arena. Arena levels and Adventure stages share the state, save states and save RAM (which remembers the mode and
+the best stage reached).
 
-What the converter fixes in the pack (all listed per level in `adventure_levels.json`):
-* exits of levels 3-9 lie past the end of their 85-tile worlds: moved onto the last platform; level 10 places its boss
-  arena past the end too, so its world is widened to 140 tiles and the corridor and arena (floor, far wall, three
-  ledges) are built where the pack describes them;
-* checkpoints and exits are given on the ground row: stood on top of it; two checkpoints over a pit moved to ground;
-* spikes sit inside the ground or hang in pits: put on the surface (3 tiles clear of platform ends, the start and the
-  checkpoint) or along the pit's bottom;
-* level 2 asks for a 5-row climb (a full jump is 4.86 rows): a spring is added; ladders lead nowhere a jump can't reach
-  (and Up is jump), so they are scenery;
-* a gem per level over its highest platform, lamps, crates in the mine, cloud platforms (one-way) for Windy Heights.
+### Generated stages (`stagegen.c`)
+
+A run's **seed** comes from what happens on the title screen (the frame count and timer when a game starts), is shown small under
+the stage banner (`SEED 1A2B3C4D`), and is the only thing a save state needs to rebuild a stage (`stage_def()` regenerates it on
+demand). The same seed, stage and difficulty always give the same stage; test builds fix it with `-DRB_SEED=n`.
+
+*Adventure:* a stage is 122 to 140 tiles wide and is built left to right out of about eight kinds of stretch (more as the
+stage number grows, weighted per stage so each has a signature): flat runs, gaps, steps up and down, stairs, hills, a high road of ledges
+over a run, pillars standing in a pit, ledge chains over a pit, **crumbling ledges** (shake for about a second after you land, fall, grow
+back), a **moving platform** that slides across a pit, a **lift** up a three-wide shaft, a **spring** that throws you onto a high block,
+**wind** zones (gusts push you; never over ice), **icicles** that hang from small ice ledges and fall when you walk under them,
+monster pens, spike runs and crate stacks (the mine). Each stage has at least one **nook**: a ledge with the treasure chest and a higher
+one with a gem. Monsters, spikes, coins and scenery are scattered over what was built, kept away from the start, checkpoint and exit;
+a top-up pass makes sure a stage has the monsters its number calls for (7 to 14, more on Hard). Stage 10 is generated up to a corridor and
+ends in the fixed boss arena (rage ogre).
+
+*Arena:* a 32 x 18 board of two to four tiers of ledges (3 to 4 rows apart; every ledge has one below it to jump from), mirrored half
+the time, in one-way snow, one-way ice, crumbling or (a few) solid blocks. From level 2 the floor can be ice, from level 3 a wind that
+gusts from alternating sides (never on an ice floor), and some levels are a **swarm** (many weak monsters) or **elite** (few spitters,
+chargers and flyers). Boss levels keep their fixed boards.
+
+*Finishable by construction and by proof:* every jump the generator asks for (gap width against height difference) comes from the
+game's own jump numbers with a margin (`sg_reach`), so a stage can always be finished. `tools/originals-levels/sg_check.c` proves it
+again independently: it copies the game's movement code, searches every spot a player can stand on from the start with walking,
+drops, and full and short jumps with and without a run-up (moving platforms count as ground over their whole beat, a lift as a ledge at each
+end), and fails unless the checkpoint, the exit, the gem and the chest can all be reached without touching a spike or falling.
+It also checks that nothing is in a wall or floating and that every Arena ledge can be climbed:
+
+```bash
+cc -O2 -I cores/originals -o /tmp/sg_check tools/originals-levels/sg_check.c cores/originals/stagegen.c -lm
+/tmp/sg_check 80            # 80 seeds x 10 stages x 2 difficulties, and the Arena boards
+/tmp/sg_check --dump 7 4    # print seed 7's stage 4
+```
+
+Monsters (shootable), wind and icicles (timing) are not part of the proof. `tools/originals-levels/convert_levels.py` is no longer
+needed to build stages; it still produces the art tables in `levels_data.h`.
 
 Art (the rich pack): each stage has its own painted background (snowy forest, ice cave, mountain cliffs, frozen
 castle, lava cavern, windy heights, ancient ruins, underground mine, crystal peak, the final castle) and its own pair of 64 px
@@ -135,16 +160,7 @@ tiles for surfaces and fill, plus one-way, lava pit and crate tiles where the st
 drawn to tile, so instead of repeating layers each is drawn 8% taller than the screen and slid across that margin as
 the camera crosses the stage (a slow parallax). Coins spin, gems sparkle, the checkpoint flag turns from red to blue,
 the exit is the pack's stone arch (barred until the final boss falls), lanterns glow; springs and spikes are the pack's
-too. The converter places scenery from the pack (a sign at the start, a chest by the exit, and per theme trees, barrels,
-mine carts, crystals or rocks about every seven tiles of open ground, never on the way or in the arena). The pack's own
-21 x 12 level files are one screen each, smaller than these stages, so they are not used.
-
-Validation: the converter ports the game's movement code (update_player / move_body) and searches every spot a player
-can stand on from the start and from the checkpoint, with full and short jumps, run-ups and springs, never standing on
-a sixteenth of a tile and letting go after landing; the exit, checkpoint, every coin and gem, and the arena ledges must
-be reachable, nothing may sit in a wall or under the score panels. It also writes the way it found; test builds with
-`-DRB_ROUTE_BOT` replay that way through the real engine (`-DRB_START_STAGE=n` starts a stage), so every stage is
-also finished by the game itself.
+too. The generator places scenery from the pack (a sign at the start and, per theme, trees, crystals or rocks on open ground; nothing that looks usable but is not).
 
 Final stage: walking into the arena shuts the gate, locks the camera and calls the rage ogre. Three phases by health
 (more fire, faster, shorter pauses), each announced; minions drop in; when it falls the barred door opens.

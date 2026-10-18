@@ -8,6 +8,7 @@
 #include "snd.h"
 #include "sprite.h"
 #include "levels.h"
+#include "stagegen.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,8 +23,9 @@
 #define MAXI 8
 #define MAXPT 140
 #define MAXPOP 12
+#define MAXIC 24                           /* icicles in one stage */
 #define MAXQ 24
-#define STATE_MAGIC 0x32425A42u    /* "BZB2": adventure mode changed the layout */
+#define STATE_MAGIC 0x33425A42u    /* "BZB3": generated stages and boards, new state fields */
 #define SAVE_MAGIC 0x31425A53u
 
 enum { S_TITLE, S_PLAY, S_PAUSE, S_OVER };
@@ -50,6 +52,8 @@ typedef struct {
 } Enemy;
 typedef struct { int32_t used, life, owner, power; float x, y, vx, vy; } Shot;    /* owner 0/1 = player, 2 = monster fire (power: 1 fire, 2 the wizard's ice, 3 a spitter's ice; drawing only) */
 typedef struct { int32_t used, type, life; float x, y, vy; } Item;
+typedef struct { int32_t c, r, mode, t; } Crumb;                                    /* a crumbling tile: mode 0 free, 1 shaking, 2 gone */
+typedef struct { int32_t mode, t; float y, vy; } Icicle;                            /* mode 0 hangs, 1 shakes, 2 falls, 3 broken */
 
 typedef struct {
     uint32_t magic, rng;
@@ -69,8 +73,13 @@ typedef struct {
     /* adventure mode (level = stage 1..LV_COUNT) */
     int32_t mode, ww, wh;
     float camx, camy;                      /* top-left of the view, in tiles */
-    uint32_t taken;                        /* collected coins / gems, by thing index */
+    uint32_t taken[8];                     /* collected coins / gems / chests, by thing index */
+    uint32_t spawned[8];                   /* monsters already brought into the stage, by thing index (they wake as the camera nears) */
     int32_t cpReached, exitOpen, arenaOn, bossPhase;   /* arenaOn: 0 not yet, 1 fight, 2 won */
+    uint32_t seed;                         /* this run's stages and boards are built from it (stagegen.c) */
+    int32_t mods, mtime;                   /* arena board flags (SGA_*); the clock of moving platforms and wind */
+    Crumb cr[SG_MAXCR];
+    Icicle ic[MAXIC];
 } State;
 
 typedef struct { uint32_t magic; uint32_t hi, bestLevel, skin, diff, mode, advBest; uint8_t reserved[36]; } Save;
@@ -88,6 +97,7 @@ static int W, H, cell, ox;
 static float S;
 static int bgLevel = -1;
 static int bgTitle = -1;
+static uint32_t bgSeed;
 
 static float u(float k) { return k * S; }
 static int fs(float k) { int v = (int)(k * S + .5f); return v < 1 ? 1 : v; }
@@ -107,32 +117,47 @@ static const Theme THEMES[4] = {
 
 /* ---- level data: floor on the last row, then platforms {row, x0, x1, kind (1 solid, 2 one-way)} ---- */
 typedef struct { int8_t row, x0, x1, kind; } Seg;
-static const Seg L0[] = {{13, 2, 10, 2}, {13, 21, 29, 2}, {9, 8, 23, 2}, {5, 2, 9, 2}, {5, 22, 29, 2}, {0, 0, 0, 0}};
-static const Seg L1[] = {{14, 0, 8, 2}, {14, 23, 31, 2}, {11, 10, 21, 2}, {8, 0, 8, 2}, {8, 23, 31, 2}, {5, 10, 21, 2}, {0, 0, 0, 0}};
-static const Seg L2[] = {{14, 4, 12, 2}, {14, 19, 27, 2}, {10, 0, 6, 2}, {10, 25, 31, 2}, {10, 13, 18, 2}, {6, 6, 12, 2}, {6, 19, 25, 2}, {0, 0, 0, 0}};
-static const Seg L3[] = {{14, 1, 9, 2}, {11, 6, 14, 2}, {8, 11, 20, 2}, {11, 17, 25, 2}, {14, 22, 30, 2}, {4, 2, 8, 2}, {4, 23, 29, 2}, {0, 0, 0, 0}};
-static const Seg L4[] = {{13, 6, 9, 1}, {13, 22, 25, 1}, {9, 13, 18, 1}, {9, 2, 5, 2}, {9, 26, 29, 2}, {5, 6, 10, 2}, {5, 21, 25, 2}, {13, 13, 18, 2}, {0, 0, 0, 0}};
 static const Seg LB[] = {{13, 3, 9, 2}, {13, 22, 28, 2}, {9, 12, 19, 2}, {5, 3, 8, 2}, {5, 23, 28, 2}, {0, 0, 0, 0}};
-static const Seg L5[] = {{14, 3, 12, 2}, {14, 19, 28, 2}, {10, 8, 23, 2}, {6, 12, 19, 2}, {6, 2, 6, 2}, {6, 25, 29, 2}, {0, 0, 0, 0}};
-static const Seg L6[] = {{14, 0, 9, 3}, {14, 22, 31, 3}, {10, 6, 25, 3}, {6, 0, 9, 3}, {6, 22, 31, 3}, {0, 0, 0, 0}};
-static const Seg L7[] = {{14, 2, 6, 1}, {14, 25, 29, 1}, {11, 9, 14, 2}, {11, 17, 22, 2}, {8, 2, 7, 2}, {8, 24, 29, 2}, {5, 11, 20, 2}, {14, 12, 19, 2}, {0, 0, 0, 0}};
-static const Seg L8[] = {{13, 4, 12, 3}, {13, 19, 27, 3}, {9, 10, 21, 3}, {5, 3, 9, 3}, {5, 22, 28, 3}, {0, 0, 0, 0}};
-static const Seg L9[] = {{16, 8, 9, 1}, {16, 22, 23, 1}, {13, 0, 6, 2}, {13, 25, 31, 2}, {12, 12, 19, 2}, {8, 5, 13, 2}, {8, 18, 26, 2}, {4, 10, 21, 2}, {0, 0, 0, 0}};
 static const Seg LB1[] = {{14, 0, 6, 2}, {14, 25, 31, 2}, {10, 6, 25, 2}, {6, 0, 5, 2}, {6, 26, 31, 2}, {0, 0, 0, 0}};
-#define NLAYOUTS 10
-static const Seg *const LAYOUTS[NLAYOUTS] = {L0, L1, L2, L3, L4, L5, L6, L7, L8, L9};
-static const uint8_t ICE_FLOOR[NLAYOUTS] = {0, 0, 0, 0, 0, 0, 0, 0, 1, 0};
 
 static int is_boss_level(int level) { return level % 5 == 0; }
 static int adventure(void);
-static const LvLevel *stage_def(void) { int i = st.level - 1; return &LV_LEVELS[i < 0 ? 0 : (i >= LV_COUNT ? LV_COUNT - 1 : i)]; }
+/* The stage being played: the art pack's stage of that number gives the look (tiles, name), stagegen.c the layout. Rebuilt on
+ * demand from the seed, so a saved state needs no more than the seed. */
+static SgStage GS;
+static LvLevel GL;
+static uint32_t glKey;
+_Static_assert(sizeof(SgThing) == sizeof(LvThing), "SgThing is LvThing");
+_Static_assert(SGK_COIN == LV_COIN && SGK_GEM == LV_GEM && SGK_SPIKES == LV_SPIKES && SGK_PITSPIKES == LV_PITSPIKES && SGK_LAMP == LV_LAMP &&
+               SGK_CRATE == LV_CRATE && SGK_ENEMY == LV_ENEMY && SGK_SPRING == LV_SPRING && SGK_DECO == LV_DECO, "thing kinds");
+static const LvLevel *stage_def(void) {
+    int i = st.level - 1; if (i < 0) i = 0; if (i >= LV_COUNT) i = LV_COUNT - 1;
+    uint32_t key = st.seed * 2654435761u + (uint32_t)(i + 1) * 40503u + (uint32_t)st.difficulty * 977u + 1u;
+    if (key != glKey || !GS.w) {
+        const LvLevel *base = &LV_LEVELS[i];
+        SgParams sp = {st.seed, i + 1, st.difficulty, base->tPit != LV_TILE_NONE, i + 1 == 8};
+        sg_adventure(&GS, &sp);
+        GL = *base;
+        GL.w = (uint8_t)GS.w; GL.h = (uint8_t)GS.h; GL.rows = NULL;
+        GL.startX = (uint8_t)GS.startX; GL.startY = (uint8_t)GS.startY; GL.cpX = (uint8_t)GS.cpX; GL.cpY = (uint8_t)GS.cpY;
+        GL.exitX = (uint8_t)GS.exitX; GL.exitY = (uint8_t)GS.exitY; GL.seconds = (uint16_t)GS.seconds;
+        GL.arenaX0 = (uint8_t)GS.arenaX0; GL.arenaX1 = (uint8_t)GS.arenaX1; GL.bossX = (uint8_t)GS.bossX; GL.bossY = (uint8_t)GS.bossY; GL.phases = (uint8_t)GS.phases;
+        GL.nthings = (uint8_t)GS.nthings; GL.things = (const LvThing *)GS.things;
+        glKey = key;
+    }
+    return &GL;
+}
+static int taken_get(int k) { return (st.taken[k >> 5] >> (k & 31)) & 1u; }
+static void taken_set(int k) { st.taken[k >> 5] |= 1u << (k & 31); }
+static int spawned_get(int k) { return (st.spawned[k >> 5] >> (k & 31)) & 1u; }
+static void spawned_set(int k) { st.spawned[k >> 5] |= 1u << (k & 31); }
+static void spawned_clear(int k) { st.spawned[k >> 5] &= ~(1u << (k & 31)); }
 /* A boss is (or is about to be) fought: arena boss levels, or the adventure arena once entered. */
 static int boss_fight(void) { return adventure() ? st.arenaOn == 1 : is_boss_level(st.level); }
 static int boss_kind(int level) { return ((level / 5) - 1) % 3; }       /* 0 ogre, 1 frost wizard, 2 rage ogre */
-static int layout_of(int level) { int n = level - 1 - level / 5; return ((n % NLAYOUTS) + NLAYOUTS) % NLAYOUTS; }
 static int boss_max(int kind, int level) { return (kind == 0 ? 12 : (kind == 1 ? 14 : 18)) + 2 * (level / 5); }
 static int is_solid(int t) { return t == 1 || t == 4 || t == 5; }
-static int is_oneway(int t) { return t == 2 || t == 3; }
+static int is_oneway(int t) { return t == 2 || t == 3 || t == SGT_CRUMBLE; }
 static int is_ice(int t) { return t == 3 || t == 4; }
 
 /* ---- buddies: six looks, the last three are earned by reaching levels ---- */
@@ -250,21 +275,33 @@ static Enemy *new_enemy(int type, float x, float y) {
     return NULL;
 }
 
+_Static_assert(SGA_W == TW && SGA_H == TH, "the generated arena board is the game board");
+#define MOD_SWARM 4                        /* st.mods: arena waves of many weak monsters */
+#define MOD_ELITE 8                        /* ... of a few strong ones */
 static void build_tiles(int level) {
     memset(st.tile, 0, sizeof st.tile);
-    st.ww = TW; st.wh = TH;
-    const Seg *seg;
-    int iceFloor = 0;
-    if (is_boss_level(level)) seg = boss_kind(level) == 1 ? LB1 : LB;
-    else { int l = layout_of(level); seg = LAYOUTS[l]; iceFloor = ICE_FLOOR[l]; }
-    for (int c = 0; c < TW; c++) st.tile[TH - 1][c] = iceFloor ? 4 : 1;
-    for (; seg->kind; seg++) for (int c = seg->x0; c <= seg->x1; c++) st.tile[seg->row][c] = (uint8_t)seg->kind;
+    st.ww = TW; st.wh = TH; st.mods = 0;
+    if (is_boss_level(level)) {
+        const Seg *seg = boss_kind(level) == 1 ? LB1 : LB;
+        for (int c = 0; c < TW; c++) st.tile[TH - 1][c] = 1;
+        for (; seg->kind; seg++) for (int c = seg->x0; c <= seg->x1; c++) st.tile[seg->row][c] = (uint8_t)seg->kind;
+    } else {
+        uint8_t board[SGA_H][SGA_W];
+        st.mods = sg_arena(board, st.seed, level);
+        for (int r = 0; r < TH; r++) memcpy(st.tile[r], board[r], TW);
+        uint32_t h = (st.seed ^ (uint32_t)level * 2246822519u) * 2654435761u;
+        h ^= h >> 15;
+        if (level >= 3 && (h >> 4) % 100 < 20) st.mods |= MOD_SWARM;
+        else if (level >= 4 && (h >> 12) % 100 < 20) st.mods |= MOD_ELITE;
+    }
 }
 
 static void snap_camera(void);
+static void adv_retry_reset(void);
 
 static void spawn_player(int i) {
     Player *p = &st.pl[i];
+    int respawn = p->dead != 0;
     p->x = i == 0 ? 6.f : 26.f; p->y = (float)(TH - 1); p->vx = p->vy = 0; p->dir = i == 0 ? 1 : -1;
     if (adventure()) {                                   /* at the checkpoint once reached, else the start; P2 a step behind */
         const LvLevel *L = stage_def();
@@ -275,6 +312,7 @@ static void spawn_player(int i) {
         if (st.phase == PH_ACTION && o->active && !o->dead && o->lives > 0 && o->ground) { p->x = o->x; p->y = o->y; }
         if (p->x < .5f) p->x = .5f;
         p->springT = 0; p->dead = 0;
+        if (respawn && st.phase == PH_ACTION && st.arenaOn == 0 && !(o->active && !o->dead && o->lives > 0 && o->ground)) adv_retry_reset();
         if (st.phase == PH_ACTION) snap_camera();
     }
     p->ground = 1; p->invuln = 150; p->dead = 0; p->shootCd = 0; p->throwAnim = 0; p->dropTimer = 0; p->coyote = 0; p->jumpBuf = 0;
@@ -284,24 +322,42 @@ static void spawn_player(int i) {
 /* ---- adventure stages (the level pack, converted by tools/originals-levels/convert_levels.py) ---- */
 static void adv_build(void) {
     const LvLevel *L = stage_def();
-    memset(st.tile, 0, sizeof st.tile);
+    memcpy(st.tile, GS.tile, sizeof st.tile);
     st.ww = L->w; st.wh = L->h;
-    for (int r = 0; r < L->h; r++)
-        for (int c = 0; c < L->w; c++) {
-            char k = L->rows[r * L->w + c];
-            st.tile[r][c] = (uint8_t)(k == '#' ? 1 : k == '=' ? 2 : k == '-' ? 3 : k == '~' ? 4 : k == 'c' ? 5 : 0);
-        }
-    st.taken = 0; st.cpReached = 0; st.arenaOn = 0; st.bossPhase = 1;
+    memset(st.taken, 0, sizeof st.taken); memset(st.spawned, 0, sizeof st.spawned);
+    memset(st.cr, 0, sizeof st.cr); memset(st.ic, 0, sizeof st.ic);
+    st.cpReached = 0; st.arenaOn = 0; st.bossPhase = 1; st.mtime = 0;
     st.exitOpen = L->arenaX1 == 0;                       /* the boss stage's exit opens when the boss falls */
-    for (int i = 0; i < L->nthings; i++) {
-        const LvThing *t = &L->things[i];
-        if (t->kind != LV_ENEMY) continue;
+}
+
+/* Monsters are brought in as the camera nears them (the stages are longer than the 16 monsters that can be alive at once). */
+static void adv_spawn(void) {
+    const LvLevel *L = stage_def();
+    float cx = st.camx + TW * .5f;
+    for (int k = 0; k < L->nthings; k++) {
+        const LvThing *t = &L->things[k];
+        if (t->kind != LV_ENEMY || spawned_get(k) || fabs_((float)t->x - cx) > 30.f) continue;
         Enemy *e = new_enemy(t->arg, (float)t->x + .5f, (float)t->y);
-        if (!e) continue;
+        if (!e) return;
         e->hx = e->x; e->pr = (float)t->patrol + .5f;
         if (t->arg == E_FLY) { e->by = (float)t->y - .2f; e->y = e->by; }
         e->timer = 20 + irnd(40);
+        spawned_set(k);
     }
+}
+
+/* After a death at the checkpoint: the monsters beyond it are back, icicles hang again. */
+static void adv_retry_reset(void) {
+    const LvLevel *L = stage_def();
+    float cx = st.cpReached ? (float)L->cpX : 0.f;
+    int ic = 0;
+    for (int k = 0; k < L->nthings; k++) {
+        const LvThing *t = &L->things[k];
+        if (t->kind == LV_ENEMY && (float)t->x >= cx) spawned_clear(k);
+        if (t->kind == SGK_ICICLE) { if (ic < MAXIC && (float)t->x >= cx) st.ic[ic].mode = 0; ic++; }
+    }
+    for (int i = 0; i < MAXE; i++) { Enemy *e = &st.en[i]; if (e->used && e->type != E_BOSS && e->type != E_GHOST && e->x >= cx) e->used = 0; }
+    memset(st.sh, 0, sizeof st.sh);
 }
 
 static void start_level(int level) {
@@ -316,6 +372,9 @@ static void start_level(int level) {
         adv_build();
         lv_background(st.level - 1);
         for (int i = 0; i < 2; i++) if (st.pl[i].active && st.pl[i].lives > 0) spawn_player(i);
+#ifdef RB_START_X                                         /* test builds: begin at this column, on the first ground below the top (screenshots of one spot) */
+        for (int r = 0; r < st.wh; r++) if (is_solid(st.tile[r][RB_START_X]) || is_oneway(st.tile[r][RB_START_X])) { st.pl[0].x = (float)RB_START_X + .5f; st.pl[0].y = (float)r; break; }
+#endif
         snap_camera();
         st.phase = PH_INTRO; st.timer = 0;
         snd_music(MUSIC_PLAY);
@@ -327,9 +386,14 @@ static void start_level(int level) {
         st.queue[st.qn++] = E_BOSS;
     } else {
         int n = 4 + level * 3 / 4; if (n > 14) n = 14;
+        if (st.mods & MOD_SWARM) n = n * 3 / 2 + 2;
+        if (st.mods & MOD_ELITE) n = n * 2 / 3 + 1;
+        if (n > MAXQ - 2) n = MAXQ - 2;
         for (int i = 0; i < n; i++) {
             int t = E_WALK, r = irnd(100);
-            if (level >= 2 && r < 25) t = E_HOP;
+            if (st.mods & MOD_SWARM) t = (level >= 2 && r < 40) ? E_HOP : E_WALK;
+            else if (st.mods & MOD_ELITE) t = r < 30 ? E_SHOOT : (r < 60 ? E_CHARGE : (r < 80 ? E_FLY : E_HOP));
+            else if (level >= 2 && r < 25) t = E_HOP;
             else if (level >= 3 && r < 45) t = E_FLY;
             else if (level >= 4 && r < 65) t = E_SHOOT;
             else if (level >= 6 && r < 85) t = E_CHARGE;
@@ -444,6 +508,126 @@ static void add_shot(float x, float y, float vx, float vy, int life, int owner, 
     }
 }
 
+/* ---- moving platforms, wind, crumbling tiles, icicles (stagegen.c lays them out) ---- */
+static float arena_gust(float *dir) {                        /* arena wind: a gust every ten seconds, the direction turning each time */
+    *dir = (st.mtime / 600) & 1 ? -1.f : 1.f;
+    int cyc = st.mtime % 600;
+    return cyc < 420 ? sinf(3.14159265f * (float)cyc / 420.f) : 0.f;
+}
+static float zone_gust(int k) {                              /* adventure wind zone number k (a thing index) */
+    int ph = (st.mtime + k * 53) % 300;
+    return ph < 210 ? sinf(3.14159265f * (float)ph / 210.f) : 0.f;
+}
+static float wind_force(float x) {
+    if (!adventure()) {
+        float d, g;
+        if (!(st.mods & SGA_WIND)) return 0.f;
+        g = arena_gust(&d);
+        return d * .014f * g;
+    }
+    const LvLevel *L = stage_def();
+    for (int k = 0; k < L->nthings; k++) {
+        const LvThing *t = &L->things[k];
+        if (t->kind != SGK_WIND || x < (float)t->x || x > (float)(t->x + t->arg)) continue;
+        return (t->patrol ? 1.f : -1.f) * .016f * zone_gust(k);
+    }
+    return 0.f;
+}
+
+static int tile_support(const Player *p) {                   /* is something solid or a ledge under the feet? */
+    int r = (int)floorf(p->y + .01f);
+    for (int c = (int)floorf(p->x - .38f); c <= (int)floorf(p->x + .38f); c++) { int k = tile_at(c, r); if (is_solid(k) || is_oneway(k)) return 1; }
+    return 0;
+}
+static void mover_carry(Player *p) {                         /* standing on a moving platform: ride it */
+    if (!adventure() || !GS.nmovers || tile_support(p)) return;
+    for (int m = 0; m < GS.nmovers; m++) {
+        const SgMover *mv = &GS.movers[m];
+        float x0, y0, x1, y1;
+        sg_mover_pos(mv, st.mtime - 1, &x0, &y0); sg_mover_pos(mv, st.mtime, &x1, &y1);
+        if (fabs_(p->y - y0) < .12f && fabs_(p->x - x0) < (float)mv->w * .5f + .3f) { p->x += x1 - x0; p->y = y1; return; }
+    }
+}
+static int mover_land(Player *p, float yBefore) {            /* falling onto a moving platform */
+    if (!adventure()) return 0;
+    for (int m = 0; m < GS.nmovers; m++) {
+        const SgMover *mv = &GS.movers[m];
+        float x1, y1;
+        sg_mover_pos(mv, st.mtime, &x1, &y1);
+        if (fabs_(p->x - x1) < (float)mv->w * .5f + .3f && yBefore <= y1 + .08f && p->y >= y1 - .001f) { p->y = y1; p->vy = 0.f; return 1; }
+    }
+    return 0;
+}
+
+static void crumble_touch(int c, int r) {
+    if (r < 0 || r >= st.wh || c < 0 || c >= st.ww || st.tile[r][c] != SGT_CRUMBLE) return;
+    int slot = -1;
+    for (int i = 0; i < SG_MAXCR; i++) {
+        if (st.cr[i].mode && st.cr[i].c == c && st.cr[i].r == r) return;
+        if (!st.cr[i].mode && slot < 0) slot = i;
+    }
+    if (slot < 0) return;
+    st.cr[slot].c = c; st.cr[slot].r = r; st.cr[slot].mode = 1; st.cr[slot].t = 52;
+}
+static void update_crumble(void) {
+    for (int i = 0; i < 2; i++) {
+        const Player *p = &st.pl[i];
+        if (!p->active || p->dead || !p->ground) continue;
+        int r = (int)floorf(p->y + .01f);
+        for (int c = (int)floorf(p->x - .38f); c <= (int)floorf(p->x + .38f); c++) crumble_touch(c, r);
+    }
+    for (int i = 0; i < SG_MAXCR; i++) {
+        Crumb *q = &st.cr[i];
+        if (!q->mode) continue;
+        if (q->c < 0 || q->c >= st.ww || q->r < 0 || q->r >= st.wh) { q->mode = 0; continue; }
+        if (q->mode == 1 && --q->t <= 0) {
+            st.tile[q->r][q->c] = 0; q->mode = 2; q->t = 260;
+            burst((float)q->c + .5f, (float)q->r + .3f, RGB(210, 235, 255), 8, .08f, .1f);
+            snd_play(SND_HIT);
+        } else if (q->mode == 2 && --q->t <= 0) {
+            if (st.tile[q->r][q->c] == 0) st.tile[q->r][q->c] = SGT_CRUMBLE;
+            q->mode = 0;
+        }
+    }
+}
+static int crumble_shake(int c, int r) {                    /* frames left of the tile's shaking, or -1 */
+    for (int i = 0; i < SG_MAXCR; i++) if (st.cr[i].mode == 1 && st.cr[i].c == c && st.cr[i].r == r) return st.cr[i].t;
+    return -1;
+}
+
+static void update_icicles(void) {
+    const LvLevel *L = stage_def();
+    int j = 0;
+    for (int k = 0; k < L->nthings && j < MAXIC; k++) {
+        const LvThing *t = &L->things[k];
+        if (t->kind != SGK_ICICLE) continue;
+        Icicle *ic = &st.ic[j++];
+        float x = (float)t->x + .5f, top = (float)t->y;
+        if (ic->mode == 0) {
+            for (int i = 0; i < 2; i++) {
+                const Player *p = &st.pl[i];
+                if (p->active && !p->dead && fabs_(p->x - x) < 1.2f && p->y > top + 1.6f && p->y < top + 11.f) { ic->mode = 1; ic->t = 24; snd_play(SND_HIT); break; }
+            }
+        } else if (ic->mode == 1) {
+            if (--ic->t <= 0) { ic->mode = 2; ic->y = top + 1.4f; ic->vy = 0.f; }
+        } else if (ic->mode == 2) {
+            ic->vy += .028f; if (ic->vy > .45f) ic->vy = .45f;
+            ic->y += ic->vy;
+            int hit = 0;
+            for (int i = 0; i < 2; i++) {
+                Player *p = &st.pl[i];
+                if (!p->active || p->dead || p->invuln > 0) continue;
+                if (fabs_(p->x - x) < .5f && ic->y > p->y - 1.f && ic->y - 1.2f < p->y) { kill_player(i); hit = 1; }
+            }
+            int tl = tile_at((int)x, (int)floorf(ic->y));
+            if (hit || is_solid(tl) || is_oneway(tl) || ic->y > (float)st.wh) {
+                ic->mode = 3;
+                burst(x, ic->y - .2f, RGB(215, 240, 255), 14, .12f, .1f); snd_play(SND_HIT); do_shake(4);
+            }
+        }
+    }
+}
+
 static void update_player(int i, const Pad *pad, const Pad *pv) {
     Player *p = &st.pl[i];
     if (!p->active) return;
@@ -463,10 +647,11 @@ static void update_player(int i, const Pad *pad, const Pad *pv) {
     int jumpPress = (pad->b && !pv->b) || (pad->up && !pv->up);
     int jumpHeld = pad->b || pad->up;
     int onIce = p->ground && is_ice(tile_at((int)floorf(p->x), (int)floorf(p->y + .01f)));
-    float maxv = .13f + (p->speedUp ? .04f : 0.f);
+    float maxv = PH_VX + (p->speedUp ? .04f : 0.f);
     float target = (float)(right - left) * maxv;
     p->vx += (target - p->vx) * (onIce ? .05f : (p->ground ? .6f : .3f));
     if (target == 0.f && !onIce && fabs_(p->vx) < .01f) p->vx = 0.f;
+    p->vx += wind_force(p->x);
     if (p->land > 0) p->land--;
     if (p->ground && fabs_(p->vx) > .08f && p->anim % 7 == 0) burst(p->x - (float)p->dir * .3f, p->y - .05f, RGB(235, 244, 255), 1, .03f, .07f);
     if (left && !right) p->dir = -1; else if (right && !left) p->dir = 1;
@@ -475,14 +660,17 @@ static void update_player(int i, const Pad *pad, const Pad *pv) {
     if (p->ground) p->coyote = 6; else if (p->coyote > 0) p->coyote--;
     if (p->jumpBuf > 0 && p->coyote > 0 && !p->springT) {
         if (down && p->ground && is_oneway(tile_at((int)floorf(p->x), (int)floorf(p->y + .01f)))) { p->dropTimer = 14; p->vy = .06f; p->ground = 0; p->coyote = 0; p->jumpBuf = 0; }
-        else { p->vy = -.575f; p->ground = 0; p->coyote = 0; p->jumpBuf = 0; snd_play(SND_JUMP); burst(p->x, p->y - .05f, RGB(235, 244, 255), 3, .05f, .08f); }
+        else { p->vy = PH_JUMP_VY; p->ground = 0; p->coyote = 0; p->jumpBuf = 0; snd_play(SND_JUMP); burst(p->x, p->y - .05f, RGB(235, 244, 255), 3, .05f, .08f); }
     }
     if (p->springT > 0) p->springT--;                           /* a spring launch flies its full height */
     else if (!jumpHeld && p->vy < -.25f) p->vy = -.25f;         /* let go early: a short hop */
-    p->vy += p->vy < 0.f ? .034f : .045f; if (p->vy > .62f) p->vy = .62f;
+    p->vy += p->vy < 0.f ? PH_GUP : PH_GDN; if (p->vy > PH_VMAX) p->vy = PH_VMAX;
     if (p->dropTimer > 0) p->dropTimer--;
     float vyBefore = p->vy; int wasGround = p->ground;
+    if (p->ground) mover_carry(p);
+    float yBefore = p->y;
     int fl = move_body(&p->x, &p->y, &p->vx, &p->vy, .4f, 1.0f, p->dropTimer > 0);
+    if (!(fl & 1) && vyBefore >= 0.f && p->dropTimer <= 0 && mover_land(p, yBefore)) fl |= 1;
     p->ground = (fl & 1) != 0;
     if (p->ground && !wasGround && vyBefore > .2f) { p->land = 7; burst(p->x, p->y - .05f, RGB(235, 244, 255), 4, .06f, .09f); }
     if (p->shootCd > 0) p->shootCd--;
@@ -754,6 +942,12 @@ static void start_game(int two) {
     st.hold = two; st.newBest = 0; st.won = 0; st.hitstop = 0; st.shake = 0;
     apply_menu_choices();
     memset(st.pt, 0, sizeof st.pt); memset(st.pop, 0, sizeof st.pop);
+    st.seed = rnd() ^ ((uint32_t)st.frame * 2654435761u) ^ ((uint32_t)st.timer << 13);     /* what you did on the title makes the run */
+#ifdef RB_SEED
+    st.seed = RB_SEED;                                       /* test builds: a fixed seed */
+#endif
+    if (!st.seed) st.seed = 1u;
+    memset(st.cr, 0, sizeof st.cr); memset(st.ic, 0, sizeof st.ic); st.mtime = 0;
 #if defined(RB_START_STAGE)
     st.mode = M_ADVENTURE; start_level(RB_START_STAGE);        /* test builds: straight into an adventure stage */
 #elif defined(RB_START_LEVEL)
@@ -813,7 +1007,8 @@ static Pad bot_pad(int i) {
 /* Adventure test bot: heads for the door, jumps walls, gaps and spikes, shoots what stands in the way, pushes snowballs,
  * and fights the boss with the arena bot. Its memory is outside the game state (test builds only). */
 static float botLastX[2];
-static int botStuck[2], botJumpHold[2];
+static int botStuck[2], botJumpHold[2], botIdle[2], botRush[2];
+static float botBest[2];
 static Pad adv_bot_pad(int i) {
     Pad p = {0};
     Player *pl = &st.pl[i];
@@ -826,7 +1021,13 @@ static Pad adv_bot_pad(int i) {
     /* monsters ahead (level with us or up to five rows above): hold back and shoot them, jumping to reach the high ones;
      * frozen ones on our level are walked into, which rolls them away */
     int hop = 0;
-    for (int k = 0; k < MAXE; k++) {
+    if (pl->x > botBest[i] + .5f || st.levelFrames < 5) { botBest[i] = pl->x; botIdle[i] = 0; } else if (++botIdle[i] > 420) { botRush[i] = 240; botIdle[i] = 0; }   /* no progress: ignore the monsters for a while */
+    if (botRush[i] > 0) botRush[i]--;
+    {   /* on or next to crumbling ledges: no time to fight */
+        int fy = (int)floorf(pl->y + .01f), cx = (int)floorf(pl->x);
+        if (tile_at(cx, fy) == SGT_CRUMBLE || tile_at(cx + 1, fy) == SGT_CRUMBLE || tile_at(cx + 2, fy) == SGT_CRUMBLE || tile_at(cx + 3, fy) == SGT_CRUMBLE) botRush[i] = 30;
+    }
+    for (int k = 0; k < MAXE && !botRush[i]; k++) {
         const Enemy *e = &st.en[k];
         if (!e->used || e->state == ES_DYING || e->state == ES_ROLL || e->type == E_GHOST) continue;
         float dx = e->x - pl->x, dy = e->y - pl->y;
@@ -841,12 +1042,25 @@ static Pad adv_bot_pad(int i) {
     }
     if (dir > 0) p.right = 1; else if (dir < 0) p.left = 1;
     int fx = (int)floorf(pl->x), feet = (int)floorf(pl->y + .01f), d = dir ? dir : pl->dir;
-    int want = 0;
-    if (pl->ground && dir) {
+    int want = 0, plate = 0, board = 0;
+    if (pl->ground && !tile_support(pl)) {                                                                   /* on a moving platform: wait for a level block ahead */
+        plate = 1; dir = 0; p.right = p.left = 0;
+        for (int m = 0; m < GS.nmovers; m++) {
+            float mx, my; sg_mover_pos(&GS.movers[m], st.mtime, &mx, &my);
+            float hw = (float)GS.movers[m].w * .5f;
+            if (fabs_(my - pl->y) < .2f && fabs_(mx - pl->x) < hw + .4f && is_solid(tile_at((int)floorf(mx + hw + .5f), feet))) { dir = 1; p.right = 1; }
+        }
+    }
+    if (pl->ground && dir && !plate) {
         int ahead = (int)floorf(pl->x + (float)d * .9f);
         if (is_solid(tile_at(ahead, feet - 1)) || is_solid(tile_at(ahead, feet - 2))) want = 1;           /* a wall or a step up */
-        int edge = (int)floorf(pl->x + (float)d * .45f);
-        if (tile_at(edge, feet) == 0) {                                                                       /* the ground ends */
+        int edge = (int)floorf(pl->x + (float)d * .3f);                                                       /* jump as late as the feet allow: the farthest jump */
+        for (int m = 0; m < GS.nmovers && d > 0; m++) {                                                       /* a moving platform at our level: step on when it is here */
+            float mx, my; sg_mover_pos(&GS.movers[m], st.mtime, &mx, &my);
+            float left = mx - (float)GS.movers[m].w * .5f;
+            if (fabs_(my - pl->y) < .7f && left > pl->x - 1.f && left < pl->x + 15.f && tile_at(edge, feet) == 0) { board = 1; if (left - pl->x > 1.1f) { dir = 0; p.right = 0; } }
+        }
+        if (tile_at(edge, feet) == 0 && !board) {                                                             /* the ground ends */
             int below = 0;
             for (int r = feet; r < feet + 3 && r < st.wh; r++) if (tile_at(edge, r)) below = 1;
             if (!below) want = 1;
@@ -859,70 +1073,12 @@ static Pad adv_bot_pad(int i) {
     }
     if (fabs_(pl->x - botLastX[i]) < .02f && pl->ground && !hop && dir) botStuck[i]++; else botStuck[i] = 0;
     botLastX[i] = pl->x;
-    if (botStuck[i] > 40) { want = 1; botStuck[i] = 0; }
+    if (botStuck[i] > 40 && !plate && !board) { want = 1; botStuck[i] = 0; }
     if (hop && pl->ground && (st.frame % 24) == 0) want = 1;
     if (want && pl->ground) botJumpHold[i] = 30;
     if (botJumpHold[i] > 0) { p.b = 1; botJumpHold[i]--; }
     if (!pl->ground && pl->vy < 0.f) p.b = 1;                                                                 /* full height */
-    return p;
-}
-/* Route bot (test builds): replays the way tools/originals-levels/convert_levels.py found through the level with the
- * game's movement maths, one move at a time - walk to the take-off point (with a run-up when the move had one), then the
- * move's exact inputs until it lands - so a level the checker passes is also finished by the real engine. The boss is
- * fought with the arena bot. */
-static int rbStep[2], rbPhase[2], rbT[2], rbAir[2], rbRun[2], rbWhich[2] = {-1, -1}, rbStage[2], rbTap[2], rbLastB[2];
-static const int RB_K[4] = {0, 6, 12, 20};
-static Pad route_bot_pad_(int i);
-static Pad route_bot_pad(int i) { Pad p = route_bot_pad_(i); rbLastB[i] = p.b; return p; }
-static Pad route_bot_pad_(int i) {
-    Pad p = {0};
-    Player *pl = &st.pl[i];
-    if (!pl->active || pl->dead) { rbPhase[i] = 0; rbRun[i] = 0; rbWhich[i] = pl->dead && st.cpReached ? 9 : -1; return p; }
-    if (st.arenaOn == 1) return bot_pad(i);
-    if (rbStage[i] != st.level) rbWhich[i] = -1;
-    int which = st.arenaOn == 2 ? 1 : (rbWhich[i] == 9 || rbWhich[i] == 2 ? 2 : 0);    /* after a checkpoint respawn: its own way */
-    const LvMove *R = LV_ROUTES[st.level - 1][which];
-    int n = LV_ROUTE_LEN[st.level - 1][which];
-    if (rbStage[i] != st.level || rbWhich[i] != which) {          /* a new stage, the arena, or back from a death */
-        rbStage[i] = st.level; rbWhich[i] = which; rbPhase[i] = 0; rbRun[i] = 0; rbStep[i] = 0;
-        float bd = 1e9f;
-        for (int k = 0; k < n && which != 2; k++) {
-            float d = fabs_((float)R[k].x4 / 4.f - pl->x) + fabs_((float)R[k].y4 / 4.f - pl->y) * 3.f;
-            if (d <= bd) { bd = d; rbStep[i] = k; }
-        }
-    }
-    if (rbStep[i] >= n) {                                          /* last move done: walk into the door */
-        float gx = (float)stage_def()->exitX + .5f;
-        if (fabs_(gx - pl->x) > .3f) { if (gx > pl->x) p.right = 1; else p.left = 1; }
-        return p;
-    }
-    const LvMove *m = &R[rbStep[i]];
-    float x0 = (float)m->x4 / 4.f;
-    int jump = m->plan & 1, hold = m->plan >> 1 & 1, d1 = (m->plan >> 2 & 3) - 1, d2 = (m->plan >> 4 & 3) - 1, k = RB_K[m->plan >> 6 & 3];
-    if (rbPhase[i] == 0) {
-        float start = m->runup ? x0 - (float)d1 * .95f : x0;
-        if (!rbRun[i]) {                                           /* walk to the start, then stand still */
-            float dx = start - pl->x;
-            if (fabs_(dx) > .3f) { if (dx > 0) p.right = 1; else p.left = 1; }
-            else if (fabs_(dx) > .08f) { if ((rbTap[i]++ % 4) == 0 && fabs_(pl->vx) < .01f) { if (dx > 0) p.right = 1; else p.left = 1; } }   /* nudges */
-            else if (fabs_(pl->vx) < .005f && pl->ground) { if (m->runup) rbRun[i] = 1; else { rbPhase[i] = 1; rbT[i] = 0; rbAir[i] = 0; } }
-            if (!rbRun[i] && rbPhase[i] == 0) return p;
-        }
-        if (rbRun[i]) {                                            /* the run-up: go when crossing the take-off point */
-            if ((pl->x - x0) * (float)d1 < 0.f) { if (d1 > 0) p.right = 1; else p.left = 1; return p; }
-            rbPhase[i] = 1; rbT[i] = 0; rbAir[i] = 0; rbRun[i] = 0;
-        }
-    }
-    if (rbT[i] == 0 && jump && rbLastB[i]) return p;               /* a jump needs a fresh press: let go for a frame */
-    if (rbT[i] > 0 && !pl->ground) rbAir[i] = 1;
-    if ((rbAir[i] && pl->ground) || (!jump && !rbAir[i] && rbT[i] > 25)) {   /* landed: let go, as the checker does */
-        rbStep[i]++; rbPhase[i] = 0; rbRun[i] = 0;
-        return p;
-    }
-    int d = rbT[i] < k ? d1 : d2;                                  /* the move, frame by frame */
-    if (d > 0) p.right = 1; else if (d < 0) p.left = 1;
-    if (jump && (rbT[i] == 0 || (hold && rbT[i] < 40))) p.b = 1;
-    rbT[i]++;
+    if (pl->ground && prev[i].b) p.b = 0;                                                                     /* a jump needs a fresh press */
     return p;
 }
 #endif
@@ -946,7 +1102,7 @@ static void update_world(void) {
 }
 
 /* ---- adventure: camera, things, the boss arena ---- */
-#define SPRING_VY (-.68f)                    /* tools/originals-levels/convert_levels.py checks the levels with this */
+#define SPRING_VY PH_SPRING_VY               /* tools/originals-levels/sg_check.c checks the stages with this */
 
 static void update_camera(int snap) {
     float sx = 0.f, sy = 0.f; int n = 0;
@@ -975,8 +1131,11 @@ static int near_thing(const Player *p, float cx, float feet, float rx, float h) 
     return fabs_(p->x - cx) < rx && p->y > feet - h && p->y - 1.f < feet;
 }
 
+#define CHEST_ARG 5                            /* LV_DECO arg of the treasure chest (levels_data.h) */
+
 static void adv_update(void) {
     const LvLevel *L = stage_def();
+    update_icicles();
     for (int i = 0; i < 2; i++) {
         Player *p = &st.pl[i];
         if (!p->active || p->dead || p->lives <= 0) continue;
@@ -984,10 +1143,15 @@ static void adv_update(void) {
         for (int k = 0; k < L->nthings; k++) {
             const LvThing *t = &L->things[k];
             float tx = (float)t->x + .5f;
-            if ((t->kind == LV_COIN || t->kind == LV_GEM) && !(st.taken >> k & 1u) && near_thing(p, tx, (float)t->y + 1.f, .6f, 1.f)) {
-                st.taken |= 1u << k;
+            if ((t->kind == LV_COIN || t->kind == LV_GEM) && !taken_get(k) && near_thing(p, tx, (float)t->y + 1.f, .6f, 1.f)) {
+                taken_set(k);
                 give_score(i, t->kind == LV_GEM ? 1000 : 100, tx, (float)t->y);
                 burst(tx, (float)t->y + .5f, t->kind == LV_GEM ? RGB(255, 90, 180) : RGB(255, 220, 80), 10, .1f, .09f);
+                snd_play(SND_ITEM);
+            } else if (t->kind == LV_DECO && t->arg == CHEST_ARG && !taken_get(k) && near_thing(p, tx, (float)t->y, .6f, 1.f)) {
+                taken_set(k);                                       /* the treasure chest: a bonus, then it is empty */
+                give_score(i, 500, tx, (float)t->y - 1.f);
+                burst(tx, (float)t->y - .5f, RGB(255, 210, 90), 24, .16f, .12f);
                 snd_play(SND_ITEM);
             } else if (t->kind == LV_SPIKES && p->invuln <= 0 && fabs_(p->x - tx) < .72f && p->y > (float)t->y - .55f && p->y - 1.f < (float)t->y) {
                 kill_player(i); break;
@@ -1046,6 +1210,7 @@ static void update_play(const Pad pads[2]) {
         if (st.pl[i].active && pads[i].start && !prev[i].start) { st.screen = S_PAUSE; st.timer = 0; snd_play(SND_PAUSE); return; }
     }
     if (st.hitstop > 0) { st.hitstop--; return; }           /* a hit freezes the game for a moment: it makes hits feel heavy */
+    st.mtime++;
     if (st.comboTimer > 0 && --st.comboTimer == 0) st.comboCount = 0;
     for (int i = 0; i < 2; i++) update_player(i, &pads[i], &prev[i]);
     if (adventure()) {
@@ -1060,11 +1225,15 @@ static void update_play(const Pad pads[2]) {
     }
 #ifdef RB_TRACE
     if (st.frame % 4 == 0) fprintf(stderr, "f%d p0 x=%.2f y=%.2f vy=%.3f ground=%d phase=%d\n", st.frame, st.pl[0].x, st.pl[0].y, st.pl[0].vy, st.pl[0].ground, st.phase);
+    if (st.frame % 200 == 0) for (int k = 0; k < MAXE; k++) if (st.en[k].used) fprintf(stderr, "  enemy type %d state %d at %.1f,%.1f\n", st.en[k].type, st.en[k].state, st.en[k].x, st.en[k].y);
 #endif
+    update_crumble();
+    if (adventure()) adv_spawn();
     update_shots();
     for (int i = 0; i < MAXE; i++) {
         Enemy *e = &st.en[i];
         if (!e->used) continue;
+        if (adventure() && e->state == ES_NORMAL && e->type != E_BOSS && e->type != E_GHOST && e->x < st.camx - 30.f) { e->used = 0; continue; }   /* far behind: gone for good */
         if (adventure() && e->state == ES_NORMAL && e->type != E_BOSS && e->type != E_GHOST && fabs_(e->x - (st.camx + TW * .5f)) > TW * .5f + 6.f) continue;   /* asleep off screen */
         if (st.phase == PH_ACTION || e->state == ES_DYING) update_enemy(e);
     }
@@ -1145,12 +1314,7 @@ static void change_skin(int dir) {
 static void update(const Pad pads[2]) {
     Pad in[2] = {pads[0], pads[1]};
 #ifdef RB_SELFTEST
-#ifdef RB_ROUTE_BOT
-    (void)adv_bot_pad;
-    in[0] = adventure() ? route_bot_pad(0) : bot_pad(0);
-#else
     in[0] = adventure() ? adv_bot_pad(0) : bot_pad(0);
-#endif
     if (st.screen == S_TITLE) { in[0].a = (st.timer > 30); }
     if (st.screen == S_OVER) { in[0].a = 1; }
 #endif
@@ -1244,7 +1408,7 @@ static void render_bg(int level) {
     float cs = (float)cell;
     for (int r = 0; r < TH; r++) for (int c = 0; c < TW; c++) {
         int k = st.tile[r][c];
-        if (!k) continue;
+        if (!k || k == SGT_CRUMBLE) continue;                      /* crumbling ledges are drawn every frame (draw_arena_dynamic) */
         float x = PX((float)c), y = PY((float)r);
         uint32_t body = is_ice(k) ? gfx_mix(t->ice, RGB(255, 255, 255), .5f) : t->ice;
         uint32_t edge = is_ice(k) ? gfx_mix(t->iceDark, RGB(120, 220, 255), .5f) : t->iceDark;
@@ -1269,7 +1433,7 @@ static void render_bg(int level) {
     gfx_rrect(s, (float)W - .12f * cs, 0, .12f * cs, (float)H, 0, t->iceDark, 110);
     s->px = keep; gfx_clip_reset(s);
     shx = keepX; shy = keepY;
-    bgLevel = level; bgTitle = st.screen == S_TITLE;
+    bgLevel = level; bgTitle = st.screen == S_TITLE; bgSeed = st.seed;
 }
 
 /* A buddy drawn in code (penguin with a scarf and a beanie): the fallback when there are no sprites.
@@ -1719,6 +1883,61 @@ static void prop(int id, float x, float feet, float tile, float sy, int alpha, i
     spr_draw(&fb, spr_frame(id, 0, 0), x, feet, &d);
 }
 
+/* cracks over a crumbling ledge tile (x, y = its top-left pixel) */
+static void crumble_cracks(float x, float y, float cs) {
+    gfx_rrect(&fb, x + .30f * cs, y + .04f * cs, .06f * cs, .30f * cs, .02f * cs, RGB(40, 70, 120), 210);
+    gfx_rrect(&fb, x + .30f * cs, y + .16f * cs, .30f * cs, .05f * cs, .02f * cs, RGB(40, 70, 120), 210);
+    gfx_rrect(&fb, x + .62f * cs, y + .10f * cs, .06f * cs, .26f * cs, .02f * cs, RGB(40, 70, 120), 210);
+    gfx_rrect(&fb, x, y, cs, .42f * cs, .14f * cs, RGB(235, 248, 255), 46);
+}
+
+static void draw_arena_dynamic(void) {
+    const Theme *th = &THEMES[theme_of(st.level)];
+    float cs = (float)cell;
+    for (int r = 0; r < TH; r++) for (int c = 0; c < TW; c++) {
+        if (st.tile[r][c] != SGT_CRUMBLE) continue;
+        float x = PX((float)c), y = PY((float)r);
+        int sh = crumble_shake(c, r);
+        if (sh >= 0) x += (float)((sh / 2) & 1 ? 1 : -1) * cs * .05f;
+        gfx_rrect(&fb, x, y, cs, .46f * cs, .16f * cs, th->iceDark, 255);
+        gfx_rrect(&fb, x + .04f * cs, y + .04f * cs, cs - .08f * cs, .32f * cs, .12f * cs, gfx_mix(th->ice, RGB(255, 255, 255), .35f), 255);
+        gfx_rrect(&fb, x + .12f * cs, y + .09f * cs, .46f * cs, .07f * cs, .035f * cs, th->iceHi, 170);
+        crumble_cracks(x, y, cs);
+    }
+    if (st.mods & SGA_WIND) {
+        float d, g = arena_gust(&d);
+        if (g > .02f) {
+            for (int i = 0; i < 14; i++) {
+                float ph = fmodf(hashf(i, 31) * 100.f + (float)st.mtime * (.25f + hashf(i, 33) * .2f) * d * 1.f, (float)TW + 4.f);
+                if (ph < 0.f) ph += (float)TW + 4.f;
+                gfx_rrect(&fb, PX(ph - 2.f), PY(hashf(i, 35) * (float)(TH - 3) + 1.f), cs * (1.f + hashf(i, 37)), cs * .05f, cs * .025f, RGB(240, 248, 255), (int)(120.f * g));
+            }
+        }
+    }
+}
+
+static void draw_icicle(const LvThing *t, const Icicle *ic) {
+    if (ic->mode == 3) return;
+    float cs = (float)cell, x = PX((float)t->x + .5f);
+    float top = ic->mode == 2 ? ic->y - 1.4f : (float)t->y;
+    float jx = ic->mode == 1 ? (float)((ic->t / 2) & 1 ? 1 : -1) * cs * .06f : 0.f, y0 = PY(top);
+    gfx_rrect(&fb, x + jx - .26f * cs, y0, .52f * cs, .55f * cs, .12f * cs, RGB(176, 224, 252), 255);
+    gfx_rrect(&fb, x + jx - .18f * cs, y0 + .42f * cs, .36f * cs, .55f * cs, .1f * cs, RGB(150, 208, 248), 255);
+    gfx_rrect(&fb, x + jx - .10f * cs, y0 + .82f * cs, .20f * cs, .6f * cs, .08f * cs, RGB(205, 238, 255), 255);
+    gfx_rrect(&fb, x + jx - .17f * cs, y0 + .06f * cs, .08f * cs, .5f * cs, .04f * cs, RGB(255, 255, 255), 190);
+}
+
+static void draw_wind_zone(int k, const LvThing *t) {
+    float g = zone_gust(k);
+    if (g < .02f || (float)(t->x + t->arg) < st.camx - 1.f || (float)t->x > st.camx + TW + 1.f) return;
+    float cs = (float)cell, range = (float)t->arg, dir = t->patrol ? 1.f : -1.f;
+    for (int i = 0; i < 12; i++) {
+        float ph = fmodf(hashf(i, k + 41) * 100.f + (float)st.mtime * (.25f + hashf(i, 43) * .2f) * dir, range + 3.f);
+        if (ph < 0.f) ph += range + 3.f;
+        gfx_rrect(&fb, PX((float)t->x - 1.5f + ph), PY(st.camy + 1.f + hashf(i, k + 45) * (float)(TH - 3)), cs * (1.f + hashf(i, 47)), cs * .05f, cs * .025f, RGB(240, 248, 255), (int)(130.f * g));
+    }
+}
+
 static void draw_adv_world(void) {
     const LvLevel *L = stage_def();
     float uu = (float)cell;
@@ -1732,17 +1951,34 @@ static void draw_adv_world(void) {
                 continue;
             }
             if (k == 5) t = L->tCrate;
+            else if (k == SGT_CRUMBLE) {                       /* a crumbling ledge: shakes, cracks, falls */
+                int sh = crumble_shake(c, r);
+                if (sh >= 0) X += ((sh / 2) & 1 ? 1 : -1) * (cell / 18 + 1);
+                lv_draw_tile(&fb, L->tOneway != LV_TILE_NONE ? L->tOneway : L->tTop, X, Y);
+                crumble_cracks((float)X, (float)Y, (float)cell);
+                continue;
+            }
             else if (is_oneway(k)) t = L->tOneway != LV_TILE_NONE ? L->tOneway : L->tTop;
             else t = (r == 0 || st.tile[r - 1][c] == 0 || st.tile[r - 1][c] == 5 || is_oneway(st.tile[r - 1][c])) ? L->tTop : L->tFill;
             lv_draw_tile(&fb, t, X, Y);
         }
+    for (int m = 0; m < GS.nmovers; m++) {                    /* moving platforms */
+        const SgMover *mv = &GS.movers[m];
+        float mx, my;
+        sg_mover_pos(mv, st.mtime, &mx, &my);
+        int t0 = L->tOneway != LV_TILE_NONE ? L->tOneway : L->tTop;
+        float px = PX(mx - (float)mv->w * .5f), py = PY(my);
+        for (int i = 0; i < mv->w; i++) lv_draw_tile(&fb, t0, (int)floorf(px + (float)(i * cell) + .5f), (int)floorf(py + .5f));
+        gfx_rrect(&fb, px, py + .62f * uu, (float)(mv->w * cell), .1f * uu, .05f * uu, RGB(40, 90, 150), 120);
+    }
+    for (int k = 0; k < L->nthings; k++) if (L->things[k].kind == SGK_WIND) draw_wind_zone(k, &L->things[k]);
     if (!spr_ready()) return;
-    /* scenery behind everything that plays: decorations, ladders, lanterns */
+    /* scenery behind everything that plays: decorations, lanterns */
     static const int DECO_SPR[7] = {SPR_TREE_IDLE, SPR_SIGN_IDLE, SPR_BARREL_IDLE, SPR_CART_IDLE, SPR_CRYSTAL_IDLE, SPR_CHEST_IDLE, SPR_ROCK_IDLE};
     for (int k = 0; k < L->nthings; k++) {
         const LvThing *t = &L->things[k];
         float x = PX((float)t->x + .5f), y = PY((float)t->y);
-        if (t->kind == LV_DECO && t->arg < 7) {
+        if (t->kind == LV_DECO && t->arg < 7 && !(t->arg == CHEST_ARG && taken_get(k))) {      /* an opened chest is gone */
             SprDraw d = {uu, 1.f, 1.f, 0.f, (t->x * 7 + t->y) & 1, 0, 255, 0};          /* every other one mirrored */
             spr_draw(&fb, spr_frame(DECO_SPR[t->arg], t->x + st.level, 1), x, y, &d);
         } else if (t->kind == LV_LADDER) prop(SPR_LADDER_IDLE, x, y, uu, (float)t->arg * .5f, 255, 0);
@@ -1771,8 +2007,9 @@ static void draw_adv_world(void) {
             for (int c = t->x + 1; c < st.ww && tile_at(c, st.wh - 1) == 0; c++) prop(SPR_SPIKES_IDLE, PX((float)c + .5f), PY((float)st.wh), uu, 1.f, 220, 0);
             break;
         case LV_SPRING: prop(SPR_SPRING_IDLE, x, y, uu, 1.f, 255, 0); break;
+        case SGK_ICICLE: { int j = 0; for (int q = 0; q < k; q++) j += L->things[q].kind == SGK_ICICLE; if (j < MAXIC) draw_icicle(t, &st.ic[j]); break; }
         case LV_COIN: case LV_GEM:
-            if (st.taken >> k & 1u) break;
+            if (taken_get(k)) break;
             {
                 float bob = sinf((float)st.frame * .08f + (float)k) * .06f * uu, cy = PY((float)t->y + .5f) + bob;
                 SprDraw d = {uu, 1.f, 1.f, 0.f, 0, 0, 255, 0};
@@ -1901,18 +2138,31 @@ static void draw_banner(void) {
             gfx_text_c(&fb, cxp, u(300), fs(5), stage_def()->name, C_ACCENT, a);
             gfx_text_c(&fb, cxp, u(370), fs(2.6f), st.level == LV_COUNT ? "THE RAGE OGRE WAITS AT THE END" : "REACH THE DOOR", C_DIM, a);
             gfx_text_c(&fb, cxp, u(420), fs(4), "GET READY!", C_GOLD, a);
+            snprintf(b, sizeof b, "SEED %08X", (unsigned)st.seed);
+            gfx_text_c(&fb, cxp, u(500), fs(2), b, C_DIM, a / 2);
             return;
         }
         if (is_boss_level(st.level)) snprintf(b, sizeof b, "BOSS FIGHT!"); else snprintf(b, sizeof b, "LEVEL %d", st.level);
         gfx_text_c(&fb, cxp + u(4), u(226) + u(4), fs(13), b, RGB(0, 0, 0), a / 2);
         gfx_text_c(&fb, cxp, u(226), fs(13), b, is_boss_level(st.level) ? RGB(255, 120, 120) : C_TEXT, a);
-        if (!is_boss_level(st.level) && is_ice(st.tile[TH - 1][0])) gfx_text_c(&fb, cxp, u(350), fs(3.4f), "SLIPPERY ICE FLOOR!", C_ACCENT, a);
-        else {
-            int ice = 0;
-            for (int r = 0; r < TH - 1; r++) for (int c = 0; c < TW; c++) if (is_ice(st.tile[r][c])) ice = 1;
-            if (ice) gfx_text_c(&fb, cxp, u(350), fs(3.4f), "WATCH OUT: SLIPPERY ICE!", C_ACCENT, a);
+        {
+            char l1[48] = "", l2[48] = "";
+            int ice = 0, crumble = 0;
+            for (int r = 0; r < TH; r++) for (int c = 0; c < TW; c++) { if (is_ice(st.tile[r][c])) ice = 1; if (st.tile[r][c] == SGT_CRUMBLE) crumble = 1; }
+            if (!is_boss_level(st.level)) {
+                if (is_ice(st.tile[TH - 1][0])) snprintf(l1, sizeof l1, "SLIPPERY ICE FLOOR");
+                else if (ice) snprintf(l1, sizeof l1, "SLIPPERY ICE");
+                if (st.mods & SGA_WIND) snprintf(l1 + strlen(l1), sizeof l1 - strlen(l1), "%sWINDY", l1[0] ? "  -  " : "");
+                if (crumble) snprintf(l2, sizeof l2, "CRUMBLING LEDGES");
+                if (st.mods & MOD_SWARM) snprintf(l2 + strlen(l2), sizeof l2 - strlen(l2), "%sSWARM", l2[0] ? "  -  " : "");
+                if (st.mods & MOD_ELITE) snprintf(l2 + strlen(l2), sizeof l2 - strlen(l2), "%sELITE MONSTERS", l2[0] ? "  -  " : "");
+            }
+            if (l1[0]) gfx_text_c(&fb, cxp, u(344), fs(3.2f), l1, C_ACCENT, a);
+            if (l2[0]) gfx_text_c(&fb, cxp, u(378), fs(3.2f), l2, RGB(255, 190, 120), a);
         }
-        gfx_text_c(&fb, cxp, u(404), fs(4), "GET READY!", C_GOLD, a);
+        gfx_text_c(&fb, cxp, u(424), fs(4), "GET READY!", C_GOLD, a);
+        snprintf(b, sizeof b, "SEED %08X", (unsigned)st.seed);
+        gfx_text_c(&fb, cxp, u(500), fs(2), b, C_DIM, a / 2);
     } else if (st.phase == PH_CLEAR) {
         int a = st.timer < 12 ? st.timer * 21 : 255;
         const char *clr = adventure() ? "STAGE CLEAR!" : "LEVEL CLEAR!";
@@ -2064,7 +2314,7 @@ static void draw(void) {
     int adv = adventure() && st.screen != S_TITLE;
     camPx = adv ? (int)floorf(st.camx * (float)cell) : 0;       /* whole pixels: tiles and characters share one grid */
     camPy = adv ? (int)floorf(st.camy * (float)cell) : 0;
-    if (!adv && (bgLevel != st.level || bgTitle != (st.screen == S_TITLE))) render_bg(st.level);
+    if (!adv && (bgLevel != st.level || bgSeed != st.seed || bgTitle != (st.screen == S_TITLE))) render_bg(st.level);
     shx = shy = 0.f;
     if (st.shake > 0 && st.screen == S_PLAY) {
         float a = (float)(st.shake > 14 ? 14 : st.shake) * u(.6f);
@@ -2075,7 +2325,7 @@ static void draw(void) {
         if (!lv_draw_bg(&fb, fx, fy)) gfx_vgrad(&fb, RGB(20, 30, 70), RGB(60, 70, 130));
         draw_snowfall(); draw_adv_world();
     }
-    else { blit_bg((int)shx, (int)shy); draw_snowfall(); }
+    else { blit_bg((int)shx, (int)shy); draw_snowfall(); if (st.screen != S_TITLE) draw_arena_dynamic(); }
     float uu = (float)cell;
     for (int i = 0; i < MAXI; i++) if (st.it[i].used) draw_item(&st.it[i]);
     for (int i = 0; i < MAXE; i++) if (st.en[i].used && st.en[i].type != E_BOSS) draw_enemy(&st.en[i]);
@@ -2168,7 +2418,7 @@ static int bz_state_load(const void *src, size_t size) {
     if (n.qn < 0 || n.qn > MAXQ || n.qi < 0 || n.qi > n.qn) return 0;
     if (n.difficulty < 0 || n.difficulty > 2 || n.skin[0] < 0 || n.skin[0] >= NSKINS || n.skin[1] < 0 || n.skin[1] >= NSKINS || n.menuRow < 0 || n.menuRow > 2) return 0;
     if (n.mode != M_ARENA && n.mode != M_ADVENTURE) return 0;
-    if (n.mode == M_ADVENTURE && (n.level < 1 || n.level > LV_COUNT || n.ww != LV_LEVELS[n.level - 1].w || n.wh != LV_LEVELS[n.level - 1].h)) return 0;
+    if (n.mode == M_ADVENTURE && (n.level < 1 || n.level > LV_COUNT || n.ww < TW || n.ww > LV_MAXW || n.wh != LV_MAXH)) return 0;
     if (n.mode == M_ARENA && (n.ww != TW || n.wh != TH)) return 0;
     if (!finite_ok(n.camx, 0.f, (float)(n.ww - TW)) || !finite_ok(n.camy, 0.f, (float)(n.wh - TH)) || n.arenaOn < 0 || n.arenaOn > 2 || n.bossPhase < 0 || n.bossPhase > 3) return 0;
     float WX = (float)n.ww, WY = (float)n.wh;
@@ -2186,11 +2436,15 @@ static int bz_state_load(const void *src, size_t size) {
     for (int i = 0; i < MAXI; i++) { const Item *t = &n.it[i]; if (t->used && (t->type < 0 || t->type >= IT_TYPES || !finite_ok(t->x, -5.f, WX + 5.f) || !finite_ok(t->y, -10.f, WY + 10.f) || !finite_ok(t->vy, -2.f, 2.f))) return 0; }
     for (int i = 0; i < MAXPT; i++) { const Part *q = &n.pt[i]; if (q->life > 0 && (q->max <= 0 || q->max > 200 || q->life > q->max || !finite_ok(q->x, -50.f, WX + 50.f) || !finite_ok(q->y, -50.f, WY + 50.f))) memset(&n.pt[i], 0, sizeof(Part)); }
     for (int i = 0; i < MAXQ; i++) if (n.queue[i] >= E_TYPES) return 0;
-    for (int r = 0; r < HMAX; r++) for (int c = 0; c < WMAX; c++) if (n.tile[r][c] > 5) return 0;   /* 3, 4: ice; 5: crate */
+    for (int r = 0; r < HMAX; r++) for (int c = 0; c < WMAX; c++) if (n.tile[r][c] > SGT_CRUMBLE) return 0;   /* 3, 4: ice; 5: crate; 6: crumbling */
+    if (n.mtime < 0 || n.mods < 0 || n.mods > 15) return 0;
+    for (int i = 0; i < SG_MAXCR; i++) { Crumb *q = &n.cr[i]; if (q->mode < 0 || q->mode > 2 || q->c < 0 || q->c >= WMAX || q->r < 0 || q->r >= HMAX || q->t < 0 || q->t > 600) memset(q, 0, sizeof *q); }
+    for (int i = 0; i < MAXIC; i++) { Icicle *q = &n.ic[i]; if (q->mode < 0 || q->mode > 3 || !finite_ok(q->y, -10.f, 40.f) || !finite_ok(q->vy, -2.f, 2.f) || q->t < 0 || q->t > 100) memset(q, 0, sizeof *q); }
     if (!n.rng) n.rng = 0x2545F491u;
     st = n;
     bgLevel = -1;
-    if (adventure()) lv_background(st.level - 1);
+    glKey = 0;                                               /* the stage's things come back from the seed */
+    if (adventure()) { (void)stage_def(); lv_background(st.level - 1); }
     snd_music(n.screen == S_TITLE ? MUSIC_TITLE : (n.screen == S_OVER ? MUSIC_OFF : MUSIC_PLAY));
     return 1;
 }

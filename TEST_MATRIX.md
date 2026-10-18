@@ -326,3 +326,26 @@ decode and scale 36 ms (720p) / 69 ms (1080p) once per stage, background memory 
 3.1 MB per ABI (was 1.1 MB; about +4 MB for an APK with two ABIs). **Not verified:** the Android build and device
 tests (no NDK here), the Mi TV (speed, the background decode there may take several times longer, memory), a person
 playing, and Arena mode's backgrounds (still drawn in code).
+
+### Blizzard Buddies: generated stages and boards, new hazards (2026-10-18, host harness + emulator)
+
+The user found the levels predictable, simple and repeated (both modes). Arena boards and Adventure stages are now built from a
+per-run seed by `cores/originals/stagegen.c` (design in `cores/originals/README.md`); the ten fixed stages' layouts are no longer
+used. New things: crumbling ledges, moving platforms, lifts, wind, icicles, ice only where there is room to stop, a nook with the
+chest and a gem in every stage, a swarm / elite wave style in Arena, stages of 122-140 tiles with 7-14 monsters that wake as the
+camera nears, monsters beyond a checkpoint come back after a death. Also earlier in the session: ladders, barrels and carts
+(which did nothing) removed, the treasure chest made a pickup (500).
+
+Checked: `tools/originals-levels/sg_check.c` (a copy of the game's movement code searching every standing spot with walks, drops,
+and short / full jumps with and without a run-up) over thousands of stage builds and Arena boards from different seeds (the final code: 2400 + 2000
+stages and 11520 + 9600 boards in two runs, no failures): every stage's checkpoint, exit, gem, chest (and stage 10's arena) reachable, nothing in a wall, every Arena ledge climbable
+(it caught and I fixed: coins inside ledges, an arena fused with the last staircase, ice + wind making a stage impossible, no nook
+in some stage 10s). The checker also ran clean under AddressSanitizer + UndefinedBehaviorSanitizer; the game's bot played Arena and
+Adventure under UndefinedBehaviorSanitizer with no reports. Through the real engine on the Mac a test bot (god mode, fixed
+seeds) crossed moving platforms and crumbling ledges and cleared up to all ten stages on some seeds; on others it gets stuck or dies
+in pits (its jumps are crude: that is the bot, the checker proves a path exists). Screenshots of an icicle hall, crumbling ledges over
+lava, a moving platform, a wind zone and three Arena boards (crumbling ledges, ice, a swarm) were looked at. Emulator: JVM tests pass,
+all 40 device tests pass (including the Blizzard save-state "exact next frame" test, so a state rebuilds the stage from its seed),
+and the app was reinstalled with the new core. **Not verified:** a person playing through the stages (difficulty and fairness of the
+hazards by feel, wind strength, whether the generated stages are fun), crumble timing with a real pad, the Mi TV (speed, nothing new
+is heavy: a stage builds in about 0.002 ms), old save states (refused: the state format changed, the cartridge save is unchanged).

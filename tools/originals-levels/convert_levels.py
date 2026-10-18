@@ -11,7 +11,7 @@ a wider board, plus a list of placed things - and fixes what the pack gets wrong
     put on the surface below them;
   * "spikes" sit at row 18 of 20, often inside the ground: over a platform they become spikes on its surface (a hazard
     to jump), over a pit they line the pit's bottom (a pit is deadly anyway);
-  * ladders lead nowhere (and Up is jump in this game): they are scenery standing on the surface;
+  * ladders lead nowhere (and Up is jump in this game): they are left out;
   * level 2 asks for a 5-row climb (a full jump is 4.86 rows): a spring (the pack's spring art) is added below it;
   * the pack's unused art gets a place: one gem per level on a high spot, lamps by checkpoints and exits, crates as
     obstacles in the mine, cloud platforms for Windy Heights.
@@ -397,10 +397,8 @@ def convert(L, fixes):
                          (f", at x {nx} to keep 3 tiles from its ends, the start and the checkpoint" if nx != x else ''))
     for pr in L['props']:
         assert pr['type'] == 'ladder'
-        x, s = put(pr['x'], pr['y'], 'ladder')
-        things.append(dict(kind='ladder', x=x, y=s, arg=max(2, min(4, s - pr['y']))))
     if L['props']:
-        fixes.append('ladders are scenery: none leads anywhere a jump cannot reach, and Up is jump in this game')
+        fixes.append('ladders left out: none leads anywhere a jump cannot reach, and Up is jump in this game')
     for en in L['enemies']:
         t = en['type']
         x, y = en['x'], en['y'] + 1
@@ -431,8 +429,8 @@ def convert(L, fixes):
 
 def scenery(lid, theme, grid, things, start, cp, ex, arena):
     """Decorations from the rich pack, placed on open ground away from everything that plays: a signpost by the start,
-    a chest by the door, and per theme pine trees (snow), crystals (cave, crystal), barrels and a minecart (the mine)
-    or boulders (ruins, lava) along the platforms."""
+    a chest by the door (a real pickup, see blizzard.c), and per theme pine trees (snow), crystals (cave, crystal) or
+    boulders (ruins, lava) along the platforms; the mine's barrels and minecart are left out (they do nothing)."""
     h, w = grid.shape
     busy = {t['x'] for t in things if t['kind'] != 'coin' and t['kind'] != 'gem'} | {start[0], cp[0], ex[0]}
     busy |= {x + d for x in (cp[0], ex[0]) for d in (-1, 1, 2, -2)}
@@ -469,7 +467,7 @@ def scenery(lid, theme, grid, things, start, cp, ex, arena):
             if kind and place(x + dx, kind[n % len(kind)]):
                 n += 1
                 break
-    return out
+    return [o for o in out if DECO[o['arg']] not in ('barrel', 'cart')]       # they look usable and are not: left out
 
 
 def find_route(W, start, hazards, springs, goal):
