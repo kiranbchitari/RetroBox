@@ -14,3 +14,4 @@ app/.cxx/
 tools/core-harness/core-harness
 .kotlin/
 cores/originals/out/
+__pycache__/
