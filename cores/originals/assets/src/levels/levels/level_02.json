@@ -1,0 +1,127 @@
+{
+  "id": 2,
+  "name": "Ice Cave",
+  "theme": "cave",
+  "tile_size": 32,
+  "world_tiles": {
+    "width": 85,
+    "height": 20
+  },
+  "player_start": {
+    "x": 2,
+    "y": 15
+  },
+  "camera": {
+    "mode": "side_scroll",
+    "follow_player": true
+  },
+  "platforms": [
+    {
+      "x": 0,
+      "y": 17,
+      "width": 9,
+      "tile": "stone"
+    },
+    {
+      "x": 11,
+      "y": 13,
+      "width": 7,
+      "tile": "stone"
+    },
+    {
+      "x": 20,
+      "y": 16,
+      "width": 8,
+      "tile": "stone"
+    },
+    {
+      "x": 30,
+      "y": 11,
+      "width": 8,
+      "tile": "stone"
+    },
+    {
+      "x": 40,
+      "y": 15,
+      "width": 10,
+      "tile": "stone"
+    },
+    {
+      "x": 52,
+      "y": 12,
+      "width": 10,
+      "tile": "stone"
+    },
+    {
+      "x": 65,
+      "y": 17,
+      "width": 20,
+      "tile": "stone"
+    }
+  ],
+  "hazards": [
+    {
+      "type": "spikes",
+      "x": 24,
+      "y": 18
+    },
+    {
+      "type": "spikes",
+      "x": 47,
+      "y": 18
+    }
+  ],
+  "collectibles": [
+    {
+      "type": "coin",
+      "x": 14,
+      "y": 11
+    },
+    {
+      "type": "coin",
+      "x": 34,
+      "y": 9
+    },
+    {
+      "type": "coin",
+      "x": 57,
+      "y": 10
+    }
+  ],
+  "props": [
+    {
+      "type": "ladder",
+      "x": 12,
+      "y": 10
+    },
+    {
+      "type": "ladder",
+      "x": 41,
+      "y": 12
+    }
+  ],
+  "enemies": [
+    {
+      "type": "walker",
+      "x": 13,
+      "y": 12,
+      "patrol_tiles": 3
+    },
+    {
+      "type": "spitter",
+      "x": 22,
+      "y": 15,
+      "patrol_tiles": 4
+    }
+  ],
+  "checkpoint": {
+    "x": 46,
+    "y": 14
+  },
+  "exit": {
+    "x": 82,
+    "y": 15
+  },
+  "recommended_character_render_scale": 1.22,
+  "time_limit_seconds": 85
+}

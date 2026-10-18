@@ -11,8 +11,8 @@ streaks, projectiles and dust are baked in, and the background carries a faint a
      (stars, sparkles, projectiles), erases the effects listed per frame below and leaves out frames whose effects
      are painted over the body (slash streaks, smoke, the yeti's snow cloud),
   3. replaces the coloured halo on the anti-aliased edge with the colour of the outline next to it,
-  4. scales each character once (all its frames alike) so it is drawn RENDER_SCALE (18%) bigger than before (the bosses:
-     than their hit box), stored at PPT pixels per game tile (art too small for that, the bosses, at fewer), and
+  4. scales each character once (all its frames alike) to VISUAL (1.25) times its hit box height (bosses: 118% of
+     theirs), stored at PPT pixels per game tile (art too small for that, the bosses, at fewer), and
      anchors every frame at the feet (bottom centre; the flyer and the effects at their centre), so all frames of a
      character share one size and one anchor,
   5. writes cores/originals/assets/blizzard_atlas.png + blizzard_atlas.json (trimmed frames, anchors, animations, fps),
@@ -39,9 +39,10 @@ PPT = 64                         # stored pixels per game tile (1080p draws at 6
 MAX_UPSCALE = 1.3                # art smaller than that needs (the bosses) is stored at most 1.3x its own size, at fewer
                                  # pixels per tile, and the game scales it the rest of the way
 MIN_BODY = 600                   # connected pixels (alpha >= 128) for a blob to count as a frame; smaller ones are effects / text
-RENDER_SCALE = 1.18              # characters are drawn 18% bigger than their size in the first version (bosses: than their
-                                 # hit box); hit boxes, physics and the feet line are unchanged
-BOSS_H = 2.5 * RENDER_SCALE      # boss hit boxes are 2.5 tiles tall (EH[E_BOSS] in blizzard.c)
+VISUAL = 1.25                    # the buddy and the small monsters are drawn 1.25x their hit box height (a 48 px hit box: a
+                                 # 60 px character); hit boxes, physics and the feet line are unchanged
+HIT_H = dict(buddy=1.0, walker=.85, hopper=.8, flyer=.75, spitter=.85, charger=.85)   # blizzard.c: the player, EH[]
+BOSS_H = 2.5 * 1.18              # bosses: 118% of their 2.5-tile hit box, about 2.8x a small monster's height
 SHEET = 'bosses/complete_character_and_boss_sheet.png'
 
 # Per character: the strip (or a region of it), how tall the idle pose is in game tiles (or 'width' for the flyer), the
@@ -50,28 +51,29 @@ SHEET = 'bosses/complete_character_and_boss_sheet.png'
 # erase rectangles in strip pixels (x0, y0, x1, y1). Frames whose effects cannot be removed without damaging the body
 # are left out (see 'omitted').
 CHARS = [
-    dict(id='buddy', strip='penguin_buddy_sprite_strip.png', size=('height', 1.12), anchor='feet', blobs=25,
+    dict(id='buddy', strip='penguin_buddy_sprite_strip.png', size=('height', VISUAL * HIT_H['buddy']), anchor='feet', blobs=25,
          anims=dict(idle=([0, 1, 2, 3], 6), run=([4, 5, 6, 7, 8], 12), jump=([9, 10, 11, 12], 0),
                     attack=([13, 14, 15, 16], 20), hit=([17, 18, 19], 10), death=([20, 21, 22, 23, 24], 8)),
          fix={16: dict(erase=[(1160, 0, 1300, 144)])}),
-    dict(id='walker', strip='walker_sprite_strip.png', size=('height', 1.08), anchor='feet', blobs=25,
+    dict(id='walker', strip='walker_sprite_strip.png', size=('height', VISUAL * HIT_H['walker']), anchor='feet', blobs=25,
          anims=dict(idle=([0, 1, 2, 3], 6), run=([4, 5, 6, 7, 8], 10), jump=([9, 10, 11, 12], 0),
                     attack=([13, 15], 8), hit=([17, 18, 19], 12), death=([20, 21, 22, 24], 8)),
          fix={}, omitted='attack 14 and 16: slash streaks painted over the body; death 23: a smoke puff over the body'),
-    dict(id='hopper', strip='hopper_sprite_strip.png', size=('height', 1.08), anchor='feet', blobs=22,
+    dict(id='hopper', strip='hopper_sprite_strip.png', size=('height', VISUAL * HIT_H['hopper']), anchor='feet', blobs=22,
          anims=dict(idle=([0, 1, 2, 3], 6), run=([4, 5, 6, '7/0/2', '7/1/2', 8], 12), jump=([9, 10, 11, 12], 0),
                     hit=([15, 16, 17], 12), death=([18, 19, 20, 21], 8)),
          fix={}, omitted='attack 13 and 14: speed lines over the body, and a tongue cut off by the next frame'),
-    dict(id='flyer', strip='flyer_sprite_strip.png', size=('width', 1.45), anchor='centre', blobs=18,
+    # the bat's frame includes its raised wings, about 45% over its body: the body is what matches the hit box
+    dict(id='flyer', strip='flyer_sprite_strip.png', size=('height', VISUAL * HIT_H['flyer'] * 1.45), anchor='centre', blobs=18,
          anims=dict(idle=([0, 1, 2], 6), fly=([3, 4, 5, 6, 7, 8], 12), attack=([9, 10, 11], 10),
                     hit=([12, 13], 10), death=([14, 15, 16, 17], 8)),
          fix={9: dict(erase=[(815, 40, 852, 110)])}),
-    dict(id='spitter', strip='spitter_sprite_strip.png', size=('height', 1.06), anchor='feet', blobs=21,
+    dict(id='spitter', strip='spitter_sprite_strip.png', size=('height', VISUAL * HIT_H['spitter']), anchor='feet', blobs=21,
          anims=dict(idle=([0, 1, 2, 3], 6), walk=([4, 5, 6, 7, 8], 8), attack=([9, 10, 11], 0),
                     hit=([14, 15], 12), death=([17, 18, 19, 20], 8)),
          fix={11: dict(erase=[(972, 0, 1030, 142)])},
          omitted='12 and 13: the spat ice balls (the game draws its own shots); hit 16: a shrunken pose that reads as a glitch'),
-    dict(id='charger', strip='charger_sprite_strip.png', size=('height', 1.0), anchor='feet', blobs=11,
+    dict(id='charger', strip='charger_sprite_strip.png', size=('height', VISUAL * HIT_H['charger']), anchor='feet', blobs=11,
          anims=dict(idle=([0, '1/0/3', '1/1/3', '1/2/3'], 6), hit=([6, '7/0/2', '7/1/2'], 8),
                     death=(['8/0/2', '8/1/2', 9, 10], 8)),
          fix={}, omitted='run and attack (2-5): a snow cloud woven through the legs; the game builds the walk and the '
@@ -99,7 +101,13 @@ CHARS = [
                     cloud=(['at:1445,824', 'at:1503,815', 'at:1576,812'], 10),
                     dust=(['at:1664,827', 'at:1701,823', 'at:1744,817'], 10)),
          fix={}, omitted='ice spikes: no move in the game uses them; the small stars and puff crumbs around the big ones'),
-]
+    # ---- level props (src/levels/props, 64 x 64 each, the whole picture one frame), sized for the game's 1-tile grid ----
+] + [dict(id=pid, strip='levels/props/%s.png' % f, size=sz, anchor=anc, unscaled=1, min_body=20,
+          anims=dict(idle=(['all'], 0)), fix={}, omitted='')
+     for pid, f, sz, anc in (('coin', 'coin', ('height', .72), 'centre'), ('gem', 'gem', ('height', .72), 'centre'),
+                             ('flag', 'checkpoint', ('height', 1.7), 'feet'), ('door', 'exit_door', ('height', 2.0), 'feet'),
+                             ('spikes', 'spikes', ('width', 1.0), 'feet'), ('spring', 'spring', ('width', .9), 'feet'),
+                             ('lamp', 'lamp', ('height', 1.7), 'feet'), ('ladder', 'ladder', ('height', 2.0), 'feet'))]
 
 # Buddy skins: the art is the blue penguin with a red scarf. A skin moves the blue body hue and the red scarf hue (and
 # for the panda turns the body near-black). Order and names follow SKINS in blizzard.c.
@@ -189,6 +197,13 @@ def extract(char, ref, a, lab, blobs):
     fix = char.get('fix', {}).get(ref, {})
     ox, oy = char.get('region', (0, 0))[:2]
     k, n = 0, 1
+    if ref == 'all':                           # a prop: the whole picture is one frame, in as many pieces as it has
+        core = a[..., 3] >= 128
+        rgba = a.copy()
+        alpha = rgba[..., 3] * dilate(core, 2)
+        alpha[core] = 255.0
+        rgba[..., 3] = alpha
+        return defringe(rgba, core)
     if isinstance(ref, str) and ref.startswith('at:'):
         px, py = (int(v) for v in ref[3:].split(','))
         under = [b for b in blobs if b[1] <= px - ox < b[3] and b[2] <= py - oy < b[4]]
@@ -421,8 +436,6 @@ def build():
         first = raw[ch.get('size_ref', list(ch['anims'].values())[0][0][0])]
         bx0, by0, bx1, by1 = bbox(first[..., 3], 64)
         kind, tiles = ch['size']
-        if not ch.get('unscaled'):
-            tiles *= RENDER_SCALE
         s = tiles * PPT / float(by1 - by0 if kind == 'height' else bx1 - bx0)
         ppt = float(PPT)
         if s > MAX_UPSCALE:

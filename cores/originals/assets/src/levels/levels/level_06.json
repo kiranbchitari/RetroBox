@@ -1,0 +1,149 @@
+{
+  "id": 6,
+  "name": "Windy Heights",
+  "theme": "snow",
+  "tile_size": 32,
+  "world_tiles": {
+    "width": 85,
+    "height": 20
+  },
+  "player_start": {
+    "x": 2,
+    "y": 15
+  },
+  "camera": {
+    "mode": "side_scroll",
+    "follow_player": true
+  },
+  "platforms": [
+    {
+      "x": 0,
+      "y": 17,
+      "width": 7,
+      "tile": "snow_ground"
+    },
+    {
+      "x": 9,
+      "y": 14,
+      "width": 6,
+      "tile": "snow_ground"
+    },
+    {
+      "x": 17,
+      "y": 11,
+      "width": 6,
+      "tile": "snow_ground"
+    },
+    {
+      "x": 25,
+      "y": 8,
+      "width": 6,
+      "tile": "snow_ground"
+    },
+    {
+      "x": 34,
+      "y": 12,
+      "width": 7,
+      "tile": "snow_ground"
+    },
+    {
+      "x": 44,
+      "y": 15,
+      "width": 6,
+      "tile": "snow_ground"
+    },
+    {
+      "x": 53,
+      "y": 11,
+      "width": 7,
+      "tile": "snow_ground"
+    },
+    {
+      "x": 63,
+      "y": 8,
+      "width": 6,
+      "tile": "snow_ground"
+    },
+    {
+      "x": 72,
+      "y": 14,
+      "width": 13,
+      "tile": "snow_ground"
+    }
+  ],
+  "hazards": [
+    {
+      "type": "spikes",
+      "x": 34,
+      "y": 18
+    },
+    {
+      "type": "spikes",
+      "x": 58,
+      "y": 18
+    }
+  ],
+  "collectibles": [
+    {
+      "type": "coin",
+      "x": 12,
+      "y": 12
+    },
+    {
+      "type": "coin",
+      "x": 28,
+      "y": 6
+    },
+    {
+      "type": "coin",
+      "x": 47,
+      "y": 13
+    },
+    {
+      "type": "coin",
+      "x": 66,
+      "y": 6
+    }
+  ],
+  "props": [
+    {
+      "type": "ladder",
+      "x": 10,
+      "y": 11
+    },
+    {
+      "type": "ladder",
+      "x": 35,
+      "y": 9
+    },
+    {
+      "type": "ladder",
+      "x": 64,
+      "y": 5
+    }
+  ],
+  "enemies": [
+    {
+      "type": "flyer",
+      "x": 11,
+      "y": 13,
+      "patrol_tiles": 3
+    },
+    {
+      "type": "hopper",
+      "x": 19,
+      "y": 10,
+      "patrol_tiles": 4
+    }
+  ],
+  "checkpoint": {
+    "x": 63,
+    "y": 14
+  },
+  "exit": {
+    "x": 112,
+    "y": 15
+  },
+  "recommended_character_render_scale": 1.22,
+  "time_limit_seconds": 115
+}

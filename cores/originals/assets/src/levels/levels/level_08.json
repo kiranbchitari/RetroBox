@@ -1,0 +1,127 @@
+{
+  "id": 8,
+  "name": "Underground Mine",
+  "theme": "cave",
+  "tile_size": 32,
+  "world_tiles": {
+    "width": 85,
+    "height": 20
+  },
+  "player_start": {
+    "x": 2,
+    "y": 15
+  },
+  "camera": {
+    "mode": "side_scroll",
+    "follow_player": true
+  },
+  "platforms": [
+    {
+      "x": 0,
+      "y": 17,
+      "width": 10,
+      "tile": "stone"
+    },
+    {
+      "x": 12,
+      "y": 13,
+      "width": 10,
+      "tile": "stone"
+    },
+    {
+      "x": 24,
+      "y": 16,
+      "width": 8,
+      "tile": "stone"
+    },
+    {
+      "x": 34,
+      "y": 12,
+      "width": 10,
+      "tile": "stone"
+    },
+    {
+      "x": 46,
+      "y": 15,
+      "width": 10,
+      "tile": "stone"
+    },
+    {
+      "x": 58,
+      "y": 11,
+      "width": 10,
+      "tile": "stone"
+    },
+    {
+      "x": 70,
+      "y": 17,
+      "width": 15,
+      "tile": "stone"
+    }
+  ],
+  "hazards": [
+    {
+      "type": "spikes",
+      "x": 24,
+      "y": 18
+    },
+    {
+      "type": "spikes",
+      "x": 47,
+      "y": 18
+    }
+  ],
+  "collectibles": [
+    {
+      "type": "coin",
+      "x": 17,
+      "y": 11
+    },
+    {
+      "type": "coin",
+      "x": 39,
+      "y": 10
+    },
+    {
+      "type": "coin",
+      "x": 63,
+      "y": 9
+    }
+  ],
+  "props": [
+    {
+      "type": "ladder",
+      "x": 13,
+      "y": 10
+    },
+    {
+      "type": "ladder",
+      "x": 47,
+      "y": 12
+    }
+  ],
+  "enemies": [
+    {
+      "type": "spitter",
+      "x": 14,
+      "y": 12,
+      "patrol_tiles": 3
+    },
+    {
+      "type": "charger",
+      "x": 26,
+      "y": 15,
+      "patrol_tiles": 4
+    }
+  ],
+  "checkpoint": {
+    "x": 68,
+    "y": 14
+  },
+  "exit": {
+    "x": 122,
+    "y": 15
+  },
+  "recommended_character_render_scale": 1.22,
+  "time_limit_seconds": 125
+}

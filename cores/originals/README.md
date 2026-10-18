@@ -22,13 +22,15 @@ ratios. Logic runs on a fixed grid at 60 Hz independent of the resolution.
 |---|---|
 | `core.c` | libretro glue: options, input (D-pad, left stick, A/B/Start), audio batch, save RAM (best scores, last menu choice), save states |
 | `blizzard.c` | Blizzard Buddies, a one-screen snowball platformer for one or two players (see below) |
+| `levels.c` | Adventure mode's tiles and parallax backgrounds: the level pack's 32 px tiles scaled once to the game tile (area filter, square pixels), the theme picture scaled to the screen height and scrolled as row copies |
+| `levels_data.h` | generated, do not edit: the ten Adventure stages (tile rows, things, start / checkpoint / exit / boss arena), tile art and backgrounds (about 220 KB of source) |
 | `sprite.c` | Blizzard's character sprites: decodes `sprites_data.h` once per picture size, pre-scales every frame to the game tile with an area filter, alpha blit with mirroring, squash/stretch, lean and a white hit flash |
 | `sprites_data.h` | generated, do not edit: the character, boss and effect frames as 255-colour palettes + run-length coded pixels, six palette-swapped buddy skins (about 930 KB of pixel data) |
 | `assets/` | `src/`: the character art pack as supplied (strips and its README), `src/bosses/`: the boss and effects pack as supplied; `blizzard_atlas.png` + `blizzard_atlas.json`: the cleaned frames, anchors and animations made from them |
 | `snake.c` | the game: grid logic, smooth sliding snake, wrap/walls, bonus fruit, title screen with an autopilot snake, pause, game over, particles |
 | `gfx.c` | software renderer: anti-aliased rounded rectangles / circles / rings, dithered gradient, vignette, 5x7 pixel font |
 | `snd.c` | sound effects and a small looping chiptune, all synthesised in code (square / triangle / noise voices with pitch slides); no audio files |
-| `build-host.sh` | builds a macOS/Linux library for `tools/core-harness` (`EXTRA_CFLAGS=-DRB_SELFTEST` makes the autopilot / a test bot play real games; Blizzard also knows `-DRB_GODMODE`, `-DRB_TRACE`, `-DRB_START_LEVEL=5` and `-DRB_SPRITE_GALLERY`, which shows every sprite frame, skin and animation instead of the title) |
+| `build-host.sh` | builds a macOS/Linux library for `tools/core-harness` (`EXTRA_CFLAGS=-DRB_SELFTEST` makes the autopilot / a test bot play real games; Blizzard also knows `-DRB_GODMODE`, `-DRB_TRACE`, `-DRB_START_LEVEL=5`, `-DRB_START_STAGE=3` with `-DRB_ROUTE_BOT` for Adventure, and `-DRB_SPRITE_GALLERY`, which shows every sprite frame, skin and animation instead of the title) |
 | `build-android.sh` | builds both Android ABIs into `app/src/main/jniLibs` (also run by `cores/build-cores.sh`) |
 
 ## Trying it without a TV
@@ -102,6 +104,48 @@ health bars are drawn in code (the packs have none).
 
 Positions, speeds and hit boxes are unchanged; only the drawing is new. If the sprites cannot be set up (no memory) the
 characters are drawn in code as before.
+
+### Adventure mode (the level pack)
+
+The title's MODE row picks ARENA (the one-screen game above, unchanged) or ADVENTURE: ten side-scrolling stages made from
+the supplied level pack (`assets/src/levels`: 32 px tiles, props, five parallax backgrounds, ten JSON layouts). The
+pack's JSON is not the game's format and is not read at run time: `tools/originals-levels/convert_levels.py` converts it
+into the same tile kinds the arena uses (solid, one-way, ice, plus crates) on boards up to 140 x 20 tiles, writes
+`levels_data.h` and `assets/adventure_levels.json` (the converted levels with every fix and check), and stops if any
+check fails. A game tile is the pack's 32 px tile; the camera shows 32 x 18 of them, follows the players (both stay on
+screen in co-op), moves in whole pixels so tiles never seam, and stops at the world's edges.
+
+Physics, hit boxes and controls are the arena's. New in Adventure: pits (falling in costs a life), spikes, springs, coins
+(100) and gems (1000), a checkpoint flag (passing it moves the respawn there), the exit door, the pack's time limit per
+stage (then the hurry-up ghost), monsters placed by the pack that patrol their stretch and sleep off screen, and the
+final stage's boss arena. Arena levels and Adventure stages share the state, save states and save RAM (which remembers
+the mode and the best stage reached).
+
+What the converter fixes in the pack (all listed per level in `adventure_levels.json`):
+* exits of levels 3-9 lie past the end of their 85-tile worlds: moved onto the last platform; level 10 places its boss
+  arena past the end too, so its world is widened to 140 tiles and the corridor and arena (floor, far wall, three
+  ledges) are built where the pack describes them;
+* checkpoints and exits are given on the ground row: stood on top of it; two checkpoints over a pit moved to ground;
+* spikes sit inside the ground or hang in pits: put on the surface (3 tiles clear of platform ends, the start and the
+  checkpoint) or along the pit's bottom;
+* level 2 asks for a 5-row climb (a full jump is 4.86 rows): a spring is added; ladders lead nowhere a jump can't reach
+  (and Up is jump), so they are scenery;
+* the pack's other art is used too: a gem per level over its highest platform, lamps, crates in the mine, cloud
+  platforms (one-way) for Windy Heights.
+
+Validation: the converter ports the game's movement code (update_player / move_body) and searches every spot a player
+can stand on from the start and from the checkpoint, with full and short jumps, run-ups and springs, never standing on
+a sixteenth of a tile and letting go after landing; the exit, checkpoint, every coin and gem, and the arena ledges must
+be reachable, nothing may sit in a wall or under the score panels. It also writes the way it found; test builds with
+`-DRB_ROUTE_BOT` replay that way through the real engine (`-DRB_START_STAGE=n` starts a stage), so every stage is
+also finished by the game itself.
+
+Final stage: walking into the arena shuts the gate, locks the camera and calls the rage ogre. Three phases by health
+(more fire, faster, shorter pauses), each announced; minions drop in; when it falls the barred door opens.
+
+Sizes: the buddy and the small monsters are drawn 1.25 times their hit box height (the 48 px hit box rule of the pack:
+a 1.0-tile player is 1.25 tiles tall; the bat's frame adds its wings), bosses 118% of their 2.5-tile hit box, about
+2.7 times a small monster. Feet stay on the bottom centre of the body.
 
 ## Adding another game
 

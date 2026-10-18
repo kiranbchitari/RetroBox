@@ -1,0 +1,123 @@
+{
+  "id": 10,
+  "name": "Final Castle",
+  "theme": "lava",
+  "tile_size": 32,
+  "world_tiles": {
+    "width": 85,
+    "height": 20
+  },
+  "player_start": {
+    "x": 2,
+    "y": 15
+  },
+  "camera": {
+    "mode": "side_scroll",
+    "follow_player": true
+  },
+  "platforms": [
+    {
+      "x": 0,
+      "y": 17,
+      "width": 14,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 16,
+      "y": 14,
+      "width": 10,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 28,
+      "y": 11,
+      "width": 10,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 40,
+      "y": 14,
+      "width": 10,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 52,
+      "y": 11,
+      "width": 10,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 64,
+      "y": 14,
+      "width": 8,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 74,
+      "y": 17,
+      "width": 11,
+      "tile": "lava_rock"
+    }
+  ],
+  "hazards": [],
+  "collectibles": [
+    {
+      "type": "coin",
+      "x": 21,
+      "y": 12
+    },
+    {
+      "type": "coin",
+      "x": 45,
+      "y": 12
+    },
+    {
+      "type": "coin",
+      "x": 68,
+      "y": 12
+    }
+  ],
+  "props": [
+    {
+      "type": "ladder",
+      "x": 17,
+      "y": 11
+    },
+    {
+      "type": "ladder",
+      "x": 53,
+      "y": 8
+    }
+  ],
+  "enemies": [
+    {
+      "type": "spitter",
+      "x": 18,
+      "y": 13,
+      "patrol_tiles": 3
+    },
+    {
+      "type": "flyer",
+      "x": 30,
+      "y": 10,
+      "patrol_tiles": 4
+    }
+  ],
+  "checkpoint": {
+    "x": 77,
+    "y": 14
+  },
+  "exit": {
+    "x": 137,
+    "y": 15
+  },
+  "recommended_character_render_scale": 1.22,
+  "time_limit_seconds": 140,
+  "boss": {
+    "type": "rage_ogre",
+    "x": 128,
+    "y": 13,
+    "arena_start_x": 115,
+    "phases": 3
+  }
+}
