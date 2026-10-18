@@ -290,3 +290,39 @@ wizard fight to its death at 720p and 1080p, no reports. Cost here: boss levels 
 sprite setup 31 ms (720p) / 62 ms (1080p), decoded sprites 5.1 MB (720p) / 9.9 MB (1080p), the core library 1.1 MB.
 **Not verified:** the Android build and device tests (no NDK here), the Mi TV (speed, setup time, memory), a person
 playing the boss fights, and a real rolled-snowball hit on a boss.
+
+### Blizzard Buddies Adventure mode: the level pack's ten stages (2026-10-18, host harness only)
+
+The supplied level pack (`cores/originals/assets/src/levels`) became a second mode beside the unchanged Arena:
+ten side-scrolling stages converted by `tools/originals-levels/convert_levels.py` (pack bugs fixed and listed per level
+in `assets/adventure_levels.json`: exits and level 10's arena past the world's end, things on the ground row, spikes
+inside the ground, a 5-row climb on level 2), drawn with the pack's tiles, props and parallax backgrounds, and a
+three-phase rage ogre arena at the end of stage 10. Characters are now 1.25x their hit box height (bosses about 2.7x a
+small monster); hit boxes and physics unchanged. Checked: the converter's port of the movement code finds the exit,
+checkpoint, all coins and gems (and the arena) reachable on every level, from the start and from the checkpoint; the
+route bot (`-DRB_ROUTE_BOT`) replays the found way in the real engine and finishes all ten stages at 720p and 1080p
+with no deaths (god mode on: monsters can't stop it, pits and spikes still kill), and again after being killed at
+each checkpoint (it respawns there and finishes); AddressSanitizer + UndefinedBehaviorSanitizer runs of all ten
+stages at 540p: no reports; arena mode levels 7 and 15 still play; title, HUD, banners, every stage and the boss
+fight looked at in dumped frames at 720p and 1080p. Not verified: a person playing the stages (difficulty, monster
+placement, the boss's three phases), save states in Adventure (the device test only covers Arena), the Android build
+and device tests (no NDK here), the Mi TV.
+
+### Blizzard Buddies rich art pack (2026-10-18, host harness only)
+
+All Blizzard art now comes from the rich pack (64 MB, fetched by `tools/originals-assets/fetch_rich_pack.sh` from the
+`Snowbros` release, SHA-256 checked, git-ignored): the buddy, five monsters and three bosses (one PNG per pose), its
+fireballs, ice orbs, stars, dust and cloud, and for Adventure a painted background and its own 64 px tiles per stage,
+spinning coins, gems, red/blue checkpoint flag, stone arch door, lanterns, springs, spikes and scenery (trees, signs,
+barrels, carts, crystals, chests, rocks). Stage layouts, physics, hit boxes and shot origins are unchanged; the pack's own
+one-screen level files are not used. Backgrounds are JPEG decoded by stb_image v2.30 (vendored, MIT). Checked in the
+Linux harness: gcc and clang `-Wall -Wextra` with no warnings; all three gallery pages at 720p and 1080p (every frame on
+its feet line); the route bot (god mode) finishes all ten stages at 720p and 1080p with no deaths, on the same frames at
+both sizes, including the rage ogre's three phases; every stage, the arena fight and the props looked at in dumped
+frames at 720p and 1080p; AddressSanitizer + UndefinedBehaviorSanitizer: all ten stages at 540p, stage 1 at 1080p,
+stage 10 at 720p, Arena levels 5, 7, 10 and 15 at 720p (the ogre and the rage ogre beaten): no reports. Cost here:
+1080p frames 98 vs 100 frames/s before, sprite setup 17 ms (720p) / 29 ms (1080p), tiles 2-3 ms, a stage's background
+decode and scale 36 ms (720p) / 69 ms (1080p) once per stage, background memory 2.2 / 4.9 MB, the stripped core library
+3.1 MB per ABI (was 1.1 MB; about +4 MB for an APK with two ABIs). **Not verified:** the Android build and device
+tests (no NDK here), the Mi TV (speed, the background decode there may take several times longer, memory), a person
+playing, and Arena mode's backgrounds (still drawn in code).

@@ -1,0 +1,116 @@
+{
+  "id": 7,
+  "name": "Ancient Ruins",
+  "theme": "forest",
+  "tile_size": 32,
+  "world_tiles": {
+    "width": 85,
+    "height": 20
+  },
+  "player_start": {
+    "x": 2,
+    "y": 15
+  },
+  "camera": {
+    "mode": "side_scroll",
+    "follow_player": true
+  },
+  "platforms": [
+    {
+      "x": 0,
+      "y": 17,
+      "width": 12,
+      "tile": "forest_ground"
+    },
+    {
+      "x": 14,
+      "y": 14,
+      "width": 9,
+      "tile": "forest_ground"
+    },
+    {
+      "x": 25,
+      "y": 11,
+      "width": 10,
+      "tile": "forest_ground"
+    },
+    {
+      "x": 37,
+      "y": 15,
+      "width": 9,
+      "tile": "forest_ground"
+    },
+    {
+      "x": 48,
+      "y": 12,
+      "width": 10,
+      "tile": "forest_ground"
+    },
+    {
+      "x": 60,
+      "y": 15,
+      "width": 9,
+      "tile": "forest_ground"
+    },
+    {
+      "x": 71,
+      "y": 17,
+      "width": 14,
+      "tile": "forest_ground"
+    }
+  ],
+  "hazards": [],
+  "collectibles": [
+    {
+      "type": "coin",
+      "x": 18,
+      "y": 12
+    },
+    {
+      "type": "coin",
+      "x": 41,
+      "y": 13
+    },
+    {
+      "type": "coin",
+      "x": 64,
+      "y": 13
+    }
+  ],
+  "props": [
+    {
+      "type": "ladder",
+      "x": 15,
+      "y": 11
+    },
+    {
+      "type": "ladder",
+      "x": 49,
+      "y": 9
+    }
+  ],
+  "enemies": [
+    {
+      "type": "walker",
+      "x": 16,
+      "y": 13,
+      "patrol_tiles": 3
+    },
+    {
+      "type": "charger",
+      "x": 27,
+      "y": 10,
+      "patrol_tiles": 4
+    }
+  ],
+  "checkpoint": {
+    "x": 66,
+    "y": 14
+  },
+  "exit": {
+    "x": 117,
+    "y": 15
+  },
+  "recommended_character_render_scale": 1.22,
+  "time_limit_seconds": 120
+}

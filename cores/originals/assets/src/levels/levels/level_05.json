@@ -1,0 +1,138 @@
+{
+  "id": 5,
+  "name": "Lava Cavern",
+  "theme": "lava",
+  "tile_size": 32,
+  "world_tiles": {
+    "width": 85,
+    "height": 20
+  },
+  "player_start": {
+    "x": 2,
+    "y": 15
+  },
+  "camera": {
+    "mode": "side_scroll",
+    "follow_player": true
+  },
+  "platforms": [
+    {
+      "x": 0,
+      "y": 17,
+      "width": 10,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 13,
+      "y": 14,
+      "width": 7,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 22,
+      "y": 11,
+      "width": 8,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 32,
+      "y": 15,
+      "width": 7,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 41,
+      "y": 12,
+      "width": 8,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 51,
+      "y": 16,
+      "width": 7,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 60,
+      "y": 12,
+      "width": 8,
+      "tile": "lava_rock"
+    },
+    {
+      "x": 70,
+      "y": 17,
+      "width": 15,
+      "tile": "lava_rock"
+    }
+  ],
+  "hazards": [
+    {
+      "type": "spikes",
+      "x": 34,
+      "y": 18
+    },
+    {
+      "type": "spikes",
+      "x": 58,
+      "y": 18
+    }
+  ],
+  "collectibles": [
+    {
+      "type": "coin",
+      "x": 16,
+      "y": 12
+    },
+    {
+      "type": "coin",
+      "x": 35,
+      "y": 13
+    },
+    {
+      "type": "coin",
+      "x": 54,
+      "y": 14
+    }
+  ],
+  "props": [
+    {
+      "type": "ladder",
+      "x": 14,
+      "y": 11
+    },
+    {
+      "type": "ladder",
+      "x": 42,
+      "y": 9
+    },
+    {
+      "type": "ladder",
+      "x": 71,
+      "y": 14
+    }
+  ],
+  "enemies": [
+    {
+      "type": "hopper",
+      "x": 15,
+      "y": 13,
+      "patrol_tiles": 3
+    },
+    {
+      "type": "spitter",
+      "x": 24,
+      "y": 10,
+      "patrol_tiles": 4
+    }
+  ],
+  "checkpoint": {
+    "x": 60,
+    "y": 14
+  },
+  "exit": {
+    "x": 107,
+    "y": 15
+  },
+  "recommended_character_render_scale": 1.22,
+  "time_limit_seconds": 110
+}

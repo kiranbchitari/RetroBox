@@ -98,7 +98,8 @@ class BlizzardDeviceTest {
         val c = open(720)
         c.run(30)
         val before = c.saveRam()!!.copyOf()
-        c.tap(PadButton.RIGHT)                                     // difficulty: Normal -> Hard
+        c.tap(PadButton.RIGHT)                                     // mode: Arena -> Adventure
+        c.tap(PadButton.DOWN); c.tap(PadButton.RIGHT)              // difficulty: Normal -> Hard
         c.tap(PadButton.DOWN); c.tap(PadButton.RIGHT)              // buddy: Blue -> Pink
         val after = c.saveRam()!!.copyOf()
         assertFalse("menu choices did not reach save RAM", before.contentEquals(after))

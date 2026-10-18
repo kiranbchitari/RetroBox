@@ -1,0 +1,133 @@
+{
+  "id": 4,
+  "name": "Frozen Castle",
+  "theme": "cave",
+  "tile_size": 32,
+  "world_tiles": {
+    "width": 85,
+    "height": 20
+  },
+  "player_start": {
+    "x": 2,
+    "y": 15
+  },
+  "camera": {
+    "mode": "side_scroll",
+    "follow_player": true
+  },
+  "platforms": [
+    {
+      "x": 0,
+      "y": 17,
+      "width": 12,
+      "tile": "stone"
+    },
+    {
+      "x": 14,
+      "y": 14,
+      "width": 10,
+      "tile": "stone"
+    },
+    {
+      "x": 26,
+      "y": 11,
+      "width": 9,
+      "tile": "stone"
+    },
+    {
+      "x": 37,
+      "y": 15,
+      "width": 10,
+      "tile": "stone"
+    },
+    {
+      "x": 49,
+      "y": 12,
+      "width": 10,
+      "tile": "stone"
+    },
+    {
+      "x": 61,
+      "y": 15,
+      "width": 9,
+      "tile": "stone"
+    },
+    {
+      "x": 72,
+      "y": 17,
+      "width": 13,
+      "tile": "stone"
+    }
+  ],
+  "hazards": [
+    {
+      "type": "spikes",
+      "x": 24,
+      "y": 18
+    },
+    {
+      "type": "spikes",
+      "x": 47,
+      "y": 18
+    }
+  ],
+  "collectibles": [
+    {
+      "type": "coin",
+      "x": 19,
+      "y": 12
+    },
+    {
+      "type": "coin",
+      "x": 42,
+      "y": 13
+    },
+    {
+      "type": "coin",
+      "x": 65,
+      "y": 13
+    }
+  ],
+  "props": [
+    {
+      "type": "ladder",
+      "x": 15,
+      "y": 11
+    },
+    {
+      "type": "ladder",
+      "x": 50,
+      "y": 9
+    }
+  ],
+  "enemies": [
+    {
+      "type": "spitter",
+      "x": 16,
+      "y": 13,
+      "patrol_tiles": 3
+    },
+    {
+      "type": "walker",
+      "x": 28,
+      "y": 10,
+      "patrol_tiles": 4
+    },
+    {
+      "type": "flyer",
+      "x": 39,
+      "y": 14,
+      "patrol_tiles": 5
+    }
+  ],
+  "checkpoint": {
+    "x": 55,
+    "y": 14
+  },
+  "exit": {
+    "x": 97,
+    "y": 15
+  },
+  "recommended_character_render_scale": 1.22,
+  "time_limit_seconds": 100
+}

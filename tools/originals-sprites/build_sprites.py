@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
-"""Builds the Blizzard Buddies character sprites from the raw art in cores/originals/assets/src: the small characters'
-strips, and the bosses and effects from the right half of src/bosses/complete_character_and_boss_sheet.png (the boss
-strips next to it are crops of that sheet that cut off the ogre's second row).
-
-The strips are generated art, not a grid: frames are irregularly spaced, some touch each other, labels, stars, motion
-streaks, projectiles and dust are baked in, and the background carries a faint alpha haze. This script:
+"""Builds the Blizzard Buddies sprites - the buddy, the five monsters, the three bosses, effects and level props - from
+the rich art pack (cores/originals/assets/src/rich, fetched by tools/originals-assets/fetch_rich_pack.sh): one
+transparent picture per animation frame. This script:
 
   1. cleans the alpha (haze below ALPHA_LO goes, the body becomes fully opaque above ALPHA_HI),
-  2. finds every frame as a connected body, splits touching frames at the thinnest column, drops labels and loose effects
-     (stars, sparkles, projectiles), erases the effects listed per frame below and leaves out frames whose effects
-     are painted over the body (slash streaks, smoke, the yeti's snow cloud),
+  2. keeps each frame's body - its biggest blob and any piece at least 12% of it - so labels printed under the feet
+     ("IDLE", "HEAVY WALK"), stray bits of neighbouring frames and loose sparks or spat balls are left out (props and
+     effects keep every piece),
   3. replaces the coloured halo on the anti-aliased edge with the colour of the outline next to it,
-  4. scales each character once (all its frames alike) so it is drawn RENDER_SCALE (18%) bigger than before (the bosses:
-     than their hit box), stored at PPT pixels per game tile (art too small for that, the bosses, at fewer), and
-     anchors every frame at the feet (bottom centre; the flyer and the effects at their centre), so all frames of a
-     character share one size and one anchor,
+  4. scales each character once (all its frames alike) to VISUAL (1.25) times its hit box height (bosses: 118% of
+     theirs), stored at PPT pixels per game tile (art too small for that at fewer), and anchors every frame at the
+     feet (bottom centre; the flyer and the effects at their centre), so all frames of a character share one size and
+     one anchor,
   5. writes cores/originals/assets/blizzard_atlas.png + blizzard_atlas.json (trimmed frames, anchors, animations, fps),
      a preview sheet, and cores/originals/sprites_data.h (per-character 255-colour palettes, run-length coded indexed
      pixels, six palette-swapped buddy skins) that the core compiles in.
@@ -38,68 +35,120 @@ ALPHA_LO, ALPHA_HI = 48, 232     # source alpha below LO is haze, above HI is so
 PPT = 64                         # stored pixels per game tile (1080p draws at 60, so the stored frames are never upscaled in play)
 MAX_UPSCALE = 1.3                # art smaller than that needs (the bosses) is stored at most 1.3x its own size, at fewer
                                  # pixels per tile, and the game scales it the rest of the way
-MIN_BODY = 600                   # connected pixels (alpha >= 128) for a blob to count as a frame; smaller ones are effects / text
-RENDER_SCALE = 1.18              # characters are drawn 18% bigger than their size in the first version (bosses: than their
-                                 # hit box); hit boxes, physics and the feet line are unchanged
-BOSS_H = 2.5 * RENDER_SCALE      # boss hit boxes are 2.5 tiles tall (EH[E_BOSS] in blizzard.c)
-SHEET = 'bosses/complete_character_and_boss_sheet.png'
+VISUAL = 1.25                    # the buddy and the small monsters are drawn 1.25x their hit box height (a 48 px hit box: a
+                                 # 60 px character); hit boxes, physics and the feet line are unchanged
+HIT_H = dict(buddy=1.0, walker=.85, hopper=.8, flyer=.75, spitter=.85, charger=.85)   # blizzard.c: the player, EH[]
+BOSS_H = 2.5 * 1.18              # bosses: 118% of their 2.5-tile hit box, about 2.8x a small monster's height
 
-# Per character: the strip (or a region of it), how tall the idle pose is in game tiles (or 'width' for the flyer), the
-# anchor mode, and the animations as lists of frames. A frame is a blob index (blobs sorted left to right), "i/k/n" =
-# piece k of blob i cut into n frames, or "at:x,y" = the biggest blob under that pixel of the strip. FIX lists per-frame
-# erase rectangles in strip pixels (x0, y0, x1, y1). Frames whose effects cannot be removed without damaging the body
-# are left out (see 'omitted').
+RICH = 'rich'                    # the rich art pack (tools/originals-assets/fetch_rich_pack.sh unpacks it there)
+
+
+def frames_of(d, *stems):
+    return ['file:%s/%s/%s.png' % (RICH, d, st) for st in stems]
+
+
+# Per character: its frames ("file:path", one picture each), how tall the idle pose is in game tiles (or 'width'), the
+# anchor mode, and the animations as lists of frames with their frames per second (0: picked from the game state).
+# Frames are shared between animations where the pack has fewer drawings than the game has poses.
+P = 'characters/penguin_buddy/frames_hd'
+E = 'enemies/%s/frames_hd'
+B = 'bosses/%s/frames_hd'
 CHARS = [
-    dict(id='buddy', strip='penguin_buddy_sprite_strip.png', size=('height', 1.12), anchor='feet', blobs=25,
-         anims=dict(idle=([0, 1, 2, 3], 6), run=([4, 5, 6, 7, 8], 12), jump=([9, 10, 11, 12], 0),
-                    attack=([13, 14, 15, 16], 20), hit=([17, 18, 19], 10), death=([20, 21, 22, 23, 24], 8)),
-         fix={16: dict(erase=[(1160, 0, 1300, 144)])}),
-    dict(id='walker', strip='walker_sprite_strip.png', size=('height', 1.08), anchor='feet', blobs=25,
-         anims=dict(idle=([0, 1, 2, 3], 6), run=([4, 5, 6, 7, 8], 10), jump=([9, 10, 11, 12], 0),
-                    attack=([13, 15], 8), hit=([17, 18, 19], 12), death=([20, 21, 22, 24], 8)),
-         fix={}, omitted='attack 14 and 16: slash streaks painted over the body; death 23: a smoke puff over the body'),
-    dict(id='hopper', strip='hopper_sprite_strip.png', size=('height', 1.08), anchor='feet', blobs=22,
-         anims=dict(idle=([0, 1, 2, 3], 6), run=([4, 5, 6, '7/0/2', '7/1/2', 8], 12), jump=([9, 10, 11, 12], 0),
-                    hit=([15, 16, 17], 12), death=([18, 19, 20, 21], 8)),
-         fix={}, omitted='attack 13 and 14: speed lines over the body, and a tongue cut off by the next frame'),
-    dict(id='flyer', strip='flyer_sprite_strip.png', size=('width', 1.45), anchor='centre', blobs=18,
-         anims=dict(idle=([0, 1, 2], 6), fly=([3, 4, 5, 6, 7, 8], 12), attack=([9, 10, 11], 10),
-                    hit=([12, 13], 10), death=([14, 15, 16, 17], 8)),
-         fix={9: dict(erase=[(815, 40, 852, 110)])}),
-    dict(id='spitter', strip='spitter_sprite_strip.png', size=('height', 1.06), anchor='feet', blobs=21,
-         anims=dict(idle=([0, 1, 2, 3], 6), walk=([4, 5, 6, 7, 8], 8), attack=([9, 10, 11], 0),
-                    hit=([14, 15], 12), death=([17, 18, 19, 20], 8)),
-         fix={11: dict(erase=[(972, 0, 1030, 142)])},
-         omitted='12 and 13: the spat ice balls (the game draws its own shots); hit 16: a shrunken pose that reads as a glitch'),
-    dict(id='charger', strip='charger_sprite_strip.png', size=('height', 1.0), anchor='feet', blobs=11,
-         anims=dict(idle=([0, '1/0/3', '1/1/3', '1/2/3'], 6), hit=([6, '7/0/2', '7/1/2'], 8),
-                    death=(['8/0/2', '8/1/2', 9, 10], 8)),
-         fix={}, omitted='run and attack (2-5): a snow cloud woven through the legs; the game builds the walk and the '
-                         'charge from the idle frames (draw_enemy_sprite in blizzard.c)'),
-    # ---- bosses (one drawing per pose; the labels' frame counts are not what is drawn) ----
-    dict(id='ogre', strip=SHEET, region=(905, 0, 1774, 290), size=('height', BOSS_H), anchor='feet', unscaled=1,
-         anims=dict(idle=(['at:1700,60'], 0), attack=(['at:1000,200', 'at:1240,180'], 0), hit=(['at:1430,220'], 0),
-                    death=(['at:1640,230'], 0)),
-         fix={}, omitted='idle: a double exposure (two ogres, two clubs); walk 1 and 2: the club changes hands or is '
-                         'missing between frames, so the walk is the idle pose with a waddle drawn by the game'),
-    dict(id='wizard', strip=SHEET, region=(905, 290, 1774, 575), size=('height', BOSS_H), anchor='feet', unscaled=1,
-         anims=dict(idle=(['at:1000,380', 'at:1175,380', 'at:1330,380'], 5), cast=(['at:1480,380'], 0),
-                    hit=(['at:1470,500'], 0), death=(['at:1650,490'], 0)),
-         fix={'at:1000,380': dict(erase=[(905, 290, 1125, 326)])},           # the "BOSS 2" label touches the hat
-         omitted='walk (2): drawn smaller than the rest and the wizard hovers; the attack panel is loose ice balls and '
-                 'spikes (the ice balls are in fx)'),
-    dict(id='rage', strip=SHEET, region=(905, 575, 1774, 745), size=('height', BOSS_H), anchor='feet', unscaled=1,
-         anims=dict(idle=(['at:1020,660'], 0), roar=(['at:1200,650'], 0), attack=(['at:1400,660'], 0),
-                    hit=(['at:1550,660'], 0), death=(['at:1680,680'], 0)),
+    dict(id='buddy', size=('height', VISUAL * HIT_H['buddy']), anchor='feet',
+         anims=dict(idle=(frames_of(P, '01_idle_01', '02_idle_02'), 3),
+                    run=(frames_of(P, '03_run_01', '04_run_02', '05_run_03', '06_run_04'), 10),
+                    jump=(frames_of(P, '07_jump_up', '08_jump_fall'), 0),
+                    attack=(frames_of(P, '09_attack_windup', '10_attack_throw'), 12),
+                    hit=(frames_of(P, '11_hit_hurt'), 0), death=(frames_of(P, '12_death_ko'), 0)),
+         fix={frames_of(P, '10_attack_throw')[0]: dict(erase=[(172, 40, 258, 170)])},    # the snowball leaving the hand
+         omitted='the snowball leaving the hand in 10 (the game draws its own shot)'),
+    dict(id='walker', size=('height', VISUAL * HIT_H['walker']), anchor='feet',
+         anims=dict(idle=(frames_of(E % 'walker_red_monster', '01_idle_01', '02_idle_02'), 3),
+                    run=(frames_of(E % 'walker_red_monster', '03_run_01', '04_run_02'), 8),
+                    jump=(frames_of(E % 'walker_red_monster', '05_jump_up', '06_leap_forward'), 0),
+                    attack=(frames_of(E % 'walker_red_monster', '07_attack_roar'), 0),
+                    hit=(frames_of(E % 'walker_red_monster', '08_hit_wince', '09_hit_crumple'), 8),
+                    death=(frames_of(E % 'walker_red_monster', '10_death_blob_01', '11_death_blob_02'), 6)),
          fix={}, omitted=''),
-    # ---- effects, sized against the full ice ball ----
-    dict(id='fx', strip=SHEET, region=(905, 775, 1774, 848), size=('width', .62), size_ref='at:1063,817',
-         anchor='centre', unscaled=1, min_body=150,
-         anims=dict(iceball=(['at:944,818', 'at:977,818', 'at:1016,818', 'at:1063,817'], 15), star=(['at:1320,821'], 0),
-                    cloud=(['at:1445,824', 'at:1503,815', 'at:1576,812'], 10),
-                    dust=(['at:1664,827', 'at:1701,823', 'at:1744,817'], 10)),
-         fix={}, omitted='ice spikes: no move in the game uses them; the small stars and puff crumbs around the big ones'),
-]
+    dict(id='hopper', size=('height', VISUAL * HIT_H['hopper']), anchor='feet',
+         anims=dict(idle=(frames_of(E % 'hopper_green_monster', '01_idle_01', '02_idle_blink', '01_idle_01', '01_idle_01'), 3),
+                    run=(frames_of(E % 'hopper_green_monster', '03_crouch_prep', '04_hop_run'), 8),
+                    jump=(frames_of(E % 'hopper_green_monster', '05_leap_stretch', '06_jump_air'), 0),
+                    attack=(frames_of(E % 'hopper_green_monster', '07_attack_long_tongue'), 0),
+                    hit=(frames_of(E % 'hopper_green_monster', '08_hit_startled'), 0),
+                    death=(frames_of(E % 'hopper_green_monster', '09_death_ko'), 0)),
+         fix={}, omitted=''),
+    # the bat's frame includes its spread wings, about 45% over its body: the body is what matches the hit box
+    dict(id='flyer', size=('height', VISUAL * HIT_H['flyer'] * 1.45), anchor='centre',
+         anims=dict(idle=(frames_of(E % 'flyer_purple_bat', '01_idle_wings_up'), 0),
+                    fly=(frames_of(E % 'flyer_purple_bat', '01_idle_wings_up', '03_fly_flap', '02_fly_wings_down', '03_fly_flap'), 10),
+                    attack=(frames_of(E % 'flyer_purple_bat', '04_attack_swoop'), 0),
+                    hit=(frames_of(E % 'flyer_purple_bat', '05_hit_hurt'), 0),
+                    death=(frames_of(E % 'flyer_purple_bat', '06_death_ko'), 0)),
+         fix={}, omitted=''),
+    dict(id='spitter', size=('height', VISUAL * HIT_H['spitter']), anchor='feet',
+         anims=dict(idle=(frames_of(E % 'spitter_blue_ice_monster', '01_idle'), 0),
+                    walk=(frames_of(E % 'spitter_blue_ice_monster', '02_walk_01', '01_idle', '03_walk_02', '01_idle'), 6),
+                    attack=(frames_of(E % 'spitter_blue_ice_monster', '04_attack_spit_ice'), 0),
+                    hit=(frames_of(E % 'spitter_blue_ice_monster', '05_hit_hurt'), 0),
+                    death=(frames_of(E % 'spitter_blue_ice_monster', '06_death_flat'), 0)),
+         keep_frac=.25, fix={}, omitted='the ice ball in the spit frame, 21% of the body (the game draws its own shots)'),
+    dict(id='charger', size=('height', VISUAL * HIT_H['charger']), anchor='feet',
+         anims=dict(idle=(frames_of(E % 'charger_white_yeti', '01_idle'), 0),
+                    walk=(frames_of(E % 'charger_white_yeti', '02_walk_heavy_01', '01_idle', '03_walk_heavy_02', '01_idle'), 5),
+                    attack=(frames_of(E % 'charger_white_yeti', '04_attack_charge_rush'), 0),
+                    hit=(frames_of(E % 'charger_white_yeti', '05_hit_stagger'), 0),
+                    death=(frames_of(E % 'charger_white_yeti', '06_death_collapsed'), 0)),
+         fix={}, omitted=''),
+    # ---- bosses: 118% of their 2.5-tile hit box ----
+    dict(id='ogre', size=('height', BOSS_H), anchor='feet',
+         anims=dict(idle=(frames_of(B % 'boss_01_ogre', '01_idle', '02_walk'), 0),
+                    attack=(frames_of(B % 'boss_01_ogre', '04_jump_slam', '03_attack_punch'), 0),     # wind-up, then the blow
+                    hit=(frames_of(B % 'boss_01_ogre', '05_hit_roar'), 0), death=(frames_of(B % 'boss_01_ogre', '06_death_defeated'), 0)),
+         fix={}, omitted=''),
+    dict(id='wizard', size=('height', BOSS_H), anchor='feet',
+         anims=dict(idle=(frames_of(B % 'boss_02_frost_wizard', '01_idle'), 0),
+                    cast=(frames_of(B % 'boss_02_frost_wizard', '02_cast_spell', '03_summon_ice_spikes'), 0),
+                    hit=(frames_of(B % 'boss_02_frost_wizard', '04_hit_stagger'), 0),
+                    death=(frames_of(B % 'boss_02_frost_wizard', '05_death_frozen_block'), 0)),
+         fix={}, omitted=''),
+    dict(id='rage', size=('height', BOSS_H), anchor='feet',
+         anims=dict(idle=(frames_of(B % 'boss_03_rage_ogre', '01_idle_fire_aura'), 0),
+                    roar=(frames_of(B % 'boss_03_rage_ogre', '02_rage_roar'), 0),
+                    attack=(frames_of(B % 'boss_03_rage_ogre', '03_attack_fire_swing'), 0),
+                    hit=(frames_of(B % 'boss_03_rage_ogre', '05_hit_hurt'), 0),
+                    death=(frames_of(B % 'boss_03_rage_ogre', '06_death_charred'), 0),
+                    charge=(frames_of(B % 'boss_03_rage_ogre', '04_attack_flame_charge'), 0)),
+         fix={}, omitted=''),
+    # ---- effects (centre-anchored, one scale for all, set by the large ice orb) ----
+    dict(id='fx', size=('width', .7), size_ref='file:%s/effects_and_projectiles/01_ice_projectiles_and_shatter/04_ice_orb_large.png' % RICH,
+         anchor='centre', keep_all=1,
+         anims=dict(iceball=(frames_of('effects_and_projectiles/01_ice_projectiles_and_shatter', '01_ice_spark_small', '03_ice_orb_medium', '04_ice_orb_large'), 15),
+                    star=(frames_of('effects_and_projectiles/03_dust_clouds_and_hit_sparks', '06_star_hit_gold_01'), 0),
+                    cloud=(frames_of('effects_and_projectiles/03_dust_clouds_and_hit_sparks', '03_dust_puff_medium', '04_dust_puff_large', '05_dust_cloud_billow'), 10),
+                    dust=(frames_of('effects_and_projectiles/03_dust_clouds_and_hit_sparks', '02_dust_puff_small', '03_dust_puff_medium', '04_dust_puff_large'), 10),
+                    fire=(frames_of('effects_and_projectiles/04_fireballs_flames_and_slashes', '01_fireball_small', '02_fireball_medium'), 12),
+                    flash=(frames_of('effects_and_projectiles/03_dust_clouds_and_hit_sparks', '08_critical_flash_burst'), 0),
+                    sparkle=(frames_of('effects_and_projectiles/03_dust_clouds_and_hit_sparks', '09_sparkle_pickup_twinkle'), 0)),
+         fix={}, omitted='ice spikes, frost mist, flames and slashes: no move in the game uses them'),
+] + [dict(id=pid, size=sz, anchor=anc, keep_all=1, anims=dict(idle=(frames_of('props_and_collectibles/hd', *stems), 0)), fix={}, omitted='')
+     for pid, stems, sz, anc in (
+         ('coin', ('18_gold_coin_front', '19_gold_coin_tilted', '17_gold_coin_star', '19_gold_coin_tilted'), ('height', .72), 'centre'),
+         ('gem', ('21_gem_ruby_red', '22_gem_diamond_cyan'), ('height', .68), 'centre'),
+         ('flag', ('08_checkpoint_flag_red', '09_checkpoint_flag_blue'), ('height', 1.8), 'feet'),
+         ('door', ('12_snowy_stone_arch_doorway',), ('height', 2.3), 'feet'),
+         ('spikes', ('16_steel_floor_spikes',), ('width', 1.0), 'feet'),
+         ('spring', ('14_bouncy_spring_red',), ('width', .9), 'feet'),
+         ('lamp', ('05_glowing_street_lantern',), ('height', 1.9), 'feet'),
+         ('ladder', ('01_wooden_ladder',), ('height', 2.0), 'feet'),
+         # scenery, placed by tools/originals-levels/convert_levels.py: no effect on play
+         ('tree', ('07_snowy_pine_tree',), ('height', 3.0), 'feet'),
+         ('sign', ('06_wooden_signpost',), ('height', 1.3), 'feet'),
+         ('barrel', ('10_wooden_barrel',), ('height', .95), 'feet'),
+         ('cart', ('11_iron_minecart',), ('width', 1.7), 'feet'),
+         ('crystal', ('23_crystal_cluster_amethyst', '24_crystal_cluster_ice_blue'), ('height', 1.1), 'feet'),
+         ('chest', ('25_treasure_chest_locked',), ('width', 1.1), 'feet'),
+         ('rock', ('26_snowy_rock_boulder',), ('width', 1.1), 'feet'))]
 
 # Buddy skins: the art is the blue penguin with a red scarf. A skin moves the blue body hue and the red scarf hue (and
 # for the panda turns the body near-black). Order and names follow SKINS in blizzard.c.
@@ -171,63 +220,21 @@ def largest(mask, keep_frac=0.12):
     return keep
 
 
-def split_columns(colcount, n):
-    """n-1 cut columns at the thinnest column near each equal division of a merged blob."""
-    w = len(colcount)
-    cuts = []
-    for k in range(1, n):
-        c = w * k // n
-        lo, hi = max(1, c - w // (2 * n)), min(w - 1, c + w // (2 * n))
-        cuts.append(lo + int(np.argmin(colcount[lo:hi])))
-    return [0] + cuts + [w]
-
-
-# ---------------------------------------------------------------- frame extraction
-
-def extract(char, ref, a, lab, blobs):
-    """One cleaned frame as straight-alpha float RGBA (0..255), cropped to its body plus a small margin."""
-    fix = char.get('fix', {}).get(ref, {})
-    ox, oy = char.get('region', (0, 0))[:2]
-    k, n = 0, 1
-    if isinstance(ref, str) and ref.startswith('at:'):
-        px, py = (int(v) for v in ref[3:].split(','))
-        under = [b for b in blobs if b[1] <= px - ox < b[3] and b[2] <= py - oy < b[4]]
-        assert under, f"{char['id']}: no body at {ref}"
-        blob = max(under, key=lambda b: b[5])
-    elif isinstance(ref, str):
-        bi, k, n = (int(v) for v in ref.split('/'))
-        blob = blobs[bi]
-    else:
-        blob = blobs[ref]
-    lid, x0, y0, x1, y1, _ = blob
-    pad = 3
-    X0, Y0, X1, Y1 = max(0, x0 - pad), max(0, y0 - pad), min(a.shape[1], x1 + pad), min(a.shape[0], y1 + pad)
-    core = lab[Y0:Y1, X0:X1] == lid
-    if n > 1:
-        # count columns over the upper three quarters only: dust and shadows along the ground bridge touching frames
-        rows = np.nonzero(core.any(1))[0]
-        upper = core[:rows.min() + int((rows.max() - rows.min()) * 0.75)]
-        cuts = split_columns(upper.sum(0), n)
-        cx0, cx1 = cuts[k], cuts[k + 1]
-        colmask = np.zeros(core.shape[1], bool)
-        colmask[cx0:cx1] = True
-        core &= colmask[None, :]
-    rgba = a[Y0:Y1, X0:X1].copy()
-    X0, Y0 = X0 + ox, Y0 + oy                   # erase rectangles are in strip pixels
-    for ex0, ey0, ex1, ey1 in fix.get('erase', []):
-        core[max(0, ey0 - Y0):max(0, ey1 - Y0), max(0, ex0 - X0):max(0, ex1 - X0)] = False
-    core = largest(core)
-    # soft edge: the cleaned alpha, but only right around this body (no haze, no neighbouring frame, no erased effect)
-    region = dilate(core, 2)
-    if n > 1:
-        region &= colmask[None, :]
-    for ex0, ey0, ex1, ey1 in fix.get('erase', []):
-        region[max(0, ey0 - Y0):max(0, ey1 - Y0), max(0, ex0 - X0):max(0, ex1 - X0)] = False
-    alpha = rgba[..., 3] * region
-    alpha[core] = 255.0                      # the body (cleaned alpha >= 128) is solid
+def extract(char, ref):
+    """One frame (a picture of its own) as straight-alpha float RGBA (0..255): the alpha haze cleaned, the body kept -
+    the biggest blob and any piece at least 12% of it - and labels, stray bits and loose sparks dropped (keep_all keeps
+    every piece: props and effects are made of several), the anti-aliased edge recoloured to the outline."""
+    assert ref.startswith('file:'), ref
+    rgba = clean_alpha(np.array(Image.open(os.path.join(SRC, ref[5:])).convert('RGBA')).astype(np.float32))
+    core = rgba[..., 3] >= 128
+    for ex0, ey0, ex1, ey1 in char.get('fix', {}).get(ref, {}).get('erase', []):
+        core[ey0:ey1, ex0:ex1] = False
+    if not char.get('keep_all'):
+        core = largest(core, char.get('keep_frac', 0.12))
+    alpha = rgba[..., 3] * dilate(core, 2)
+    alpha[core] = 255.0
     rgba[..., 3] = alpha
-    rgba = defringe(rgba, core)
-    return rgba
+    return defringe(rgba, core)
 
 
 def clean_alpha(a):
@@ -400,15 +407,6 @@ def skin_palette(pal, skin):
 def build():
     chars_out = []
     for ch in CHARS:
-        a = np.array(Image.open(os.path.join(SRC, ch['strip'])).convert('RGBA')).astype(np.float32)
-        if 'region' in ch:
-            rx0, ry0, rx1, ry1 = ch['region']
-            a = a[ry0:ry1, rx0:rx1]
-        a = clean_alpha(a)
-        lab, comps = components(a[..., 3] >= 128)
-        blobs = sorted([c for c in comps if c[5] >= ch.get('min_body', MIN_BODY)], key=lambda c: c[1])
-        if 'blobs' in ch:
-            assert len(blobs) == ch['blobs'], f"{ch['id']}: {len(blobs)} bodies, expected {ch['blobs']}: frame indices would shift"
         refs = []
         for name, (frames, fps) in ch['anims'].items():
             for r in frames:
@@ -416,13 +414,11 @@ def build():
                     refs.append(r)
         if 'size_ref' in ch and ch['size_ref'] not in refs:
             refs.append(ch['size_ref'])
-        raw = {r: extract(ch, r, a, lab, blobs) for r in refs}
+        raw = {r: extract(ch, r) for r in refs}
         # one scale for the whole character, from its first idle frame (or size_ref)
         first = raw[ch.get('size_ref', list(ch['anims'].values())[0][0][0])]
         bx0, by0, bx1, by1 = bbox(first[..., 3], 64)
         kind, tiles = ch['size']
-        if not ch.get('unscaled'):
-            tiles *= RENDER_SCALE
         s = tiles * PPT / float(by1 - by0 if kind == 'height' else bx1 - bx0)
         ppt = float(PPT)
         if s > MAX_UPSCALE:
@@ -434,7 +430,7 @@ def build():
             x0, y0, x1, y1 = bbox(f[..., 3], 2)
             f = f[y0:y1, x0:x1]
             frames[r] = dict(img=f, ax=ax - x0, ay=ay - y0)
-        print(f"{ch['id']}: {len(blobs)} bodies, {len(refs)} frames, scale {s:.3f}, {ppt:.1f} px per tile", file=sys.stderr)
+        print(f"{ch['id']}: {len(refs)} frames, scale {s:.3f}, {ppt:.1f} px per tile", file=sys.stderr)
         chars_out.append(dict(ch=ch, frames=frames, refs=refs, ppt=ppt))
     return chars_out
 
@@ -457,14 +453,13 @@ def pack(chars_out):
         rowh = max(rowh, h)
     H = y + rowh
     atlas = np.zeros((H, W, 4), np.float32)
-    meta = dict(source='cores/originals/assets/src (generated art pack), built by tools/originals-sprites/build_sprites.py',
+    meta = dict(source='cores/originals/assets/src/rich (the rich art pack), built by tools/originals-sprites/build_sprites.py',
                 image='blizzard_atlas.png', size=[W, H],
                 notes=['frames are trimmed; anchor_x/anchor_y = the feet (or the flyer\'s, wizard\'s fx\'s centre) inside '
                        'the trimmed frame; cell/cell_anchor = the common untrimmed size every frame of the character fits in',
                        'pixels_per_tile: atlas pixels per game tile for that character (the bosses are stored smaller and '
                        'scaled up when drawn)',
-                       'frames[].source = the body in the strip, left to right from 0, "body/piece/pieces" for frames '
-                       'cut out of touching ones, or "at:x,y" = the body under that pixel of the strip',
+                       'frames[].source = the picture the frame was made from (file:path under assets/src)',
                        'fps 0 = the frame is picked from the game state (vertical speed, the spit wind-up timer)',
                        'all art faces right; the game mirrors it'],
                 characters={})
@@ -486,7 +481,7 @@ def pack(chars_out):
         for name, (frames, fps) in ch['anims'].items():
             anims[name] = dict(frames=[c['refs'].index(r) for r in frames], fps=fps, loop=name in ('idle', 'run', 'walk', 'fly'))
         meta['characters'][ch['id']] = dict(
-            strip='src/' + ch['strip'], region=list(ch.get('region', [])), pixels_per_tile=round(c['ppt'], 3),
+            pixels_per_tile=round(c['ppt'], 3),
             anchor='feet (bottom centre)' if ch['anchor'] == 'feet' else 'body centre',
             faces='right', cell=[int(np.ceil(cell_l + cell_r)), int(np.ceil(cell_t + cell_b))],
             cell_anchor=[int(np.ceil(cell_l)), int(np.ceil(cell_t))], frames=fr_meta, animations=anims,
@@ -534,23 +529,24 @@ def write_header(atlas, meta):
         full = np.zeros(len(pm), np.int32)
         full[vis] = labels + 1
         off = 0
-        first_frame = nframe
+        rows = []                                  # each picture's pixels are coded once ...
         for f in cm['frames']:
             n = f['w'] * f['h']
             idx = full[off:off + n].reshape(f['h'], f['w']).astype(np.uint8)
             off += n
-            enc = encode_rle(idx)
-            frame_rows.append((len(data), f['w'], f['h'], f['anchor_x'], f['anchor_y']))
-            data += enc
-            nframe += 1
+            rows.append((len(data), f['w'], f['h'], f['anchor_x'], f['anchor_y']))
+            data += encode_rle(idx)
+        first_frame = nframe                       # ... and every animation gets its own run of frame records, so an
+        for name, an in cm['animations'].items():  # animation is (first, count) even when it reuses another's pictures
+            anim_rows.append((cid, name, nframe, len(an['frames']), an['fps']))
+            for i in an['frames']:
+                frame_rows.append(rows[i])
+                nframe += 1
         pals = [pal] if cid != 'buddy' else [skin_palette(pal, sk) for sk in SKINS]
         pal_first = len(pal_rows)
         for p in pals:
             pal_rows.append(np.concatenate([np.zeros((1, 4), np.uint8), p]))
-        for name, an in cm['animations'].items():
-            anim_rows.append((cid, name, first_frame + an['frames'][0], len(an['frames']), an['fps']))
-            assert an['frames'] == list(range(an['frames'][0], an['frames'][0] + len(an['frames']))), 'animation frames must be consecutive'
-        char_rows.append((cid, first_frame, len(cm['frames']), pal_first, len(pals), cm['pixels_per_tile']))
+        char_rows.append((cid, first_frame, nframe - first_frame, pal_first, len(pals), cm['pixels_per_tile']))
     L = lines.append
     L('/* GENERATED by tools/originals-sprites/build_sprites.py from cores/originals/assets/src - do not edit. */')
     L('/* Blizzard Buddies character sprites: palette-indexed, run-length coded. */')

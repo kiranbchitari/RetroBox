@@ -1,6 +1,6 @@
 # RetroBox TV
 
-An Android TV retro-gaming frontend that runs libretro emulator cores (it contains no home-made emulators). Target: Xiaomi Mi TV 4A with a Bluetooth gamepad. Systems: NES, SNES, Game Boy, Game Boy Color, Game Boy Advance (two cores), plus **RetroBox Originals**, games made for RetroBox itself (Snake and the snowball platformer Blizzard Buddies, `cores/originals/`). `.zip` ROMs, fast-forward and turbo buttons are supported.
+An Android TV retro-gaming frontend that runs libretro emulator cores (it contains no home-made emulators). Target: Xiaomi Mi TV 4A with a Bluetooth gamepad. Systems: NES, SNES, Game Boy, Game Boy Color, Game Boy Advance (two cores), plus **RetroBox Originals**, games made for RetroBox itself (Snake and the snowball platformer Blizzard Buddies with its one-screen Arena and ten-stage side-scrolling Adventure, `cores/originals/`). `.zip` ROMs, fast-forward and turbo buttons are supported.
 
 * `INSTALL.md`: build, sign, install (ADB / USB), ROM folders, controller pairing, on-device tests
 * `TROUBLESHOOTING.md`: symptoms and what to try
